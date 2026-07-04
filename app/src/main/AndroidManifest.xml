@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Ktor 监听端口需要 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 前台服务（API 28+ 必须声明）-->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- targetSdk 34+ 前台服务必须声明类型对应权限；本地 HTTP server 用 specialUse
+         （dataSync 在 Android 15 上有每日 6 小时上限，不适合常驻服务器）-->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Android 13+ 发通知需动态申请 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:theme="@android:style/Theme.Material.Light.DarkActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".WebServerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Local HTTP server hosting the on-device dashboard" />
+        </service>
+
+    </application>
+
+</manifest>
