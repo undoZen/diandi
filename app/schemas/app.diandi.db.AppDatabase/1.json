@@ -1,0 +1,272 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "c4450336ee24ebfa3a18dcbd962f9bb4",
+    "entities": [
+      {
+        "tableName": "notification_history",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `postTime` INTEGER NOT NULL, `sbnKey` TEXT NOT NULL, `sbnId` INTEGER NOT NULL, `tag` TEXT, `uid` INTEGER, `isClearable` INTEGER NOT NULL, `isOngoing` INTEGER NOT NULL, `groupKey` TEXT, `whenTime` INTEGER NOT NULL, `category` TEXT, `channelId` TEXT, `priority` INTEGER NOT NULL, `flags` INTEGER NOT NULL, `template` TEXT, `actions` TEXT, `title` TEXT, `titleBig` TEXT, `text` TEXT, `bigText` TEXT, `subText` TEXT, `infoText` TEXT, `summaryText` TEXT, `textLines` TEXT, `messages` TEXT, `people` TEXT, `progress` INTEGER, `progressMax` INTEGER, `showChronometer` INTEGER NOT NULL, `hasPicture` INTEGER NOT NULL, `importance` INTEGER, `receivedAt` INTEGER NOT NULL, `removedAt` INTEGER, `removeReason` INTEGER, `contentHash` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "packageName",
+            "columnName": "packageName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "postTime",
+            "columnName": "postTime",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sbnKey",
+            "columnName": "sbnKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sbnId",
+            "columnName": "sbnId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tag",
+            "columnName": "tag",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "uid",
+            "columnName": "uid",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "isClearable",
+            "columnName": "isClearable",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isOngoing",
+            "columnName": "isOngoing",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "groupKey",
+            "columnName": "groupKey",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "whenTime",
+            "columnName": "whenTime",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "channelId",
+            "columnName": "channelId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "priority",
+            "columnName": "priority",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "flags",
+            "columnName": "flags",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "template",
+            "columnName": "template",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "actions",
+            "columnName": "actions",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "titleBig",
+            "columnName": "titleBig",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "text",
+            "columnName": "text",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "bigText",
+            "columnName": "bigText",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "subText",
+            "columnName": "subText",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "infoText",
+            "columnName": "infoText",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "summaryText",
+            "columnName": "summaryText",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "textLines",
+            "columnName": "textLines",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "messages",
+            "columnName": "messages",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "people",
+            "columnName": "people",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "progress",
+            "columnName": "progress",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "progressMax",
+            "columnName": "progressMax",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "showChronometer",
+            "columnName": "showChronometer",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hasPicture",
+            "columnName": "hasPicture",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "importance",
+            "columnName": "importance",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "receivedAt",
+            "columnName": "receivedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "removedAt",
+            "columnName": "removedAt",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "removeReason",
+            "columnName": "removeReason",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "contentHash",
+            "columnName": "contentHash",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_notification_history_packageName",
+            "unique": false,
+            "columnNames": [
+              "packageName"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_notification_history_packageName` ON `${TABLE_NAME}` (`packageName`)"
+          },
+          {
+            "name": "index_notification_history_postTime",
+            "unique": false,
+            "columnNames": [
+              "postTime"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_notification_history_postTime` ON `${TABLE_NAME}` (`postTime`)"
+          },
+          {
+            "name": "index_notification_history_sbnKey",
+            "unique": false,
+            "columnNames": [
+              "sbnKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_notification_history_sbnKey` ON `${TABLE_NAME}` (`sbnKey`)"
+          }
+        ],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'c4450336ee24ebfa3a18dcbd962f9bb4')"
+    ]
+  }
+}

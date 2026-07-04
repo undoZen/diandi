@@ -35,4 +35,32 @@
         android:layout_height="wrap_content"
         android:text="停止服务" />
 
+    <TextView
+        android:id="@+id/notif_access_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="15sp"
+        android:layout_marginTop="32dp"
+        android:layout_marginBottom="8dp" />
+
+    <Button
+        android:id="@+id/btn_notif_access"
+        android:layout_width="200dp"
+        android:layout_height="wrap_content"
+        android:text="授予通知使用权" />
+
+    <TextView
+        android:id="@+id/battery_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="15sp"
+        android:layout_marginTop="24dp"
+        android:layout_marginBottom="8dp" />
+
+    <Button
+        android:id="@+id/btn_battery"
+        android:layout_width="200dp"
+        android:layout_height="wrap_content"
+        android:text="忽略电池优化" />
+
 </LinearLayout>

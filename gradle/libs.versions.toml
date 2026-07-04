@@ -2,11 +2,20 @@
 agp = "8.7.3"
 kotlin = "2.1.10"
 ktor = "3.1.1"
+# KSP 版本前半段必须与 Kotlin 版本一致
+ksp = "2.1.10-1.0.31"
+# Room 2.7+ 要求 compileSdk 35（本机只装了 platform-34），暂钉 2.6.1；升 35 时一并升
+room = "2.6.1"
 
 [libraries]
 ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
 ktor-server-cio = { module = "io.ktor:ktor-server-cio", version.ref = "ktor" }
+room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+room = { id = "androidx.room", version.ref = "room" }

@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
 }
 
 android {
@@ -42,7 +44,17 @@ kotlin {
     }
 }
 
+room {
+    // schema 历史入库，将来数据库升级写 Migration 时要用
+    schemaDirectory("$projectDir/schemas")
+}
+
 dependencies {
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.cio)
+
+    // 采集层：通知落库
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx) // suspend DAO + Flow 支持
+    ksp(libs.room.compiler)
 }
