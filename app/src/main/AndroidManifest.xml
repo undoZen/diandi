@@ -3,6 +3,8 @@
 
     <!-- Ktor 监听端口需要 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 检测网络状态（WiFi/蜂窝，LAN IP 探测用） -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- 前台服务（API 28+ 必须声明）-->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <!-- targetSdk 34+ 前台服务必须声明类型对应权限；本地 HTTP server 用 specialUse
@@ -13,11 +15,17 @@
     <!-- 保活：开机自启 + 引导用户忽略电池优化 -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- 全屏提醒（锁屏弹出 AlertActivity）；Android 14+ 需用户在系统设置确认 -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Android 11+ 包可见性：包名→App 显示名解析需要（自用 App，不上架，随便用；
+         上架 Play 会被拒，届时换 <queries> 白名单） -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <application
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
-        android:theme="@android:style/Theme.Material.Light.DarkActionBar">
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:theme="@android:style/Theme.Material.NoActionBar">
 
         <activity
             android:name=".MainActivity"
@@ -27,6 +35,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 全屏提醒页：锁屏可显示；excludeFromRecents 避免留在最近任务 -->
+        <activity
+            android:name=".alert.AlertActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
 
         <service
             android:name=".WebServerService"

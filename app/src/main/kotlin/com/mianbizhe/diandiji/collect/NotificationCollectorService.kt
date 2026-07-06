@@ -1,12 +1,16 @@
-package app.diandi.collect
+package com.mianbizhe.diandiji.collect
 
 import android.app.Notification
 import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
-import app.diandi.db.AppDatabase
-import app.diandi.db.NotificationEntity
+import com.mianbizhe.diandiji.AppWhitelist
+import com.mianbizhe.diandiji.WebServerService
+import com.mianbizhe.diandiji.alert.AlertGate
+import com.mianbizhe.diandiji.db.AppDatabase
+import com.mianbizhe.diandiji.spend.SpendPipeline
+import com.mianbizhe.diandiji.db.NotificationEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,15 +35,36 @@ class NotificationCollectorService : NotificationListenerService() {
     companion object {
         private const val TAG = "diandi-collect"
 
+        /**
+         * 采集层丢弃名单（不落库）。加得极克制——本地优先原则是「先存全」，
+         * 只丢确定无分析价值的系统杂音：
+         * - "android"：系统 UI 常驻提示（正在运行的应用/USB 调试/充电等），量大且无信息量
+         */
+        private val DROP_PACKAGES = setOf("android")
+
         /** 监听器是否已连接（授权 + 系统已绑定），给 UI 显示状态用 */
         @Volatile
         var isConnected = false
             private set
     }
 
+    override fun onCreate() {
+        super.onCreate()
+        Log.i(TAG, "service created")
+    }
+
     override fun onListenerConnected() {
         isConnected = true
         Log.i(TAG, "listener connected")
+        // 清掉丢弃名单的存量记录（幂等，连接时跑一次开销可忽略）
+        scope.launch {
+            try {
+                val n = dao.deleteByPackages(DROP_PACKAGES)
+                if (n > 0) Log.i(TAG, "purged $n rows from dropped packages")
+            } catch (e: Exception) {
+                Log.e(TAG, "purge failed", e)
+            }
+        }
     }
 
     override fun onListenerDisconnected() {
@@ -50,6 +75,7 @@ class NotificationCollectorService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return // 跳过自己（Ktor 前台服务通知）
+        if (sbn.packageName in DROP_PACKAGES) return // 系统杂音直接丢弃
 
         val entity = try {
             sbn.toEntity()
@@ -62,7 +88,25 @@ class NotificationCollectorService : NotificationListenerService() {
         scope.launch {
             try {
                 if (dao.lastContentHash(entity.sbnKey) == entity.contentHash) return@launch
-                dao.insert(entity)
+                val insertedId = dao.insert(entity)
+                // 更新前台通知计数
+                WebServerService.onCollect(this@NotificationCollectorService, isSpending = false)
+                // 命中提醒规则（如信用卡消费）→ 全屏弹出
+                if (AlertGate.shouldAlert(entity)) {
+                    AlertGate.fireAlert(this@NotificationCollectorService, entity)
+                }
+                // 财务通知 → 消费管线（解析/去重/分类落 spending 表）
+                // 独立 try/catch：管线炸不能影响采集主链路
+                if (entity.packageName in AppWhitelist.finance) {
+                    try {
+                        val created = SpendPipeline.process(applicationContext, entity.copy(id = insertedId))
+                        if (created) {
+                            WebServerService.onCollect(this@NotificationCollectorService, isSpending = true)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "spend pipeline failed", e)
+                    }
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "insert failed", e)
             }

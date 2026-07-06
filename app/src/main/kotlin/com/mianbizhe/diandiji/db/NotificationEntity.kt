@@ -1,4 +1,4 @@
-package app.diandi.db
+package com.mianbizhe.diandiji.db
 
 import androidx.room.Entity
 import androidx.room.Index

@@ -1,4 +1,4 @@
-package app.diandi
+package com.mianbizhe.diandiji
 
 import android.content.BroadcastReceiver
 import android.content.Context

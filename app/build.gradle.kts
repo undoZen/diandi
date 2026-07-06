@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "app.diandi"
+    namespace = "com.mianbizhe.diandiji"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "app.diandi"
+        applicationId = "com.mianbizhe.diandiji"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
@@ -57,4 +57,8 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx) // suspend DAO + Flow 支持
     ksp(libs.room.compiler)
+
+    // 单测（JVM 本地跑）：org.json 在单测里是 stub，须替换为真实现
+    testImplementation(libs.junit)
+    testImplementation(libs.json)
 }

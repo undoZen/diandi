@@ -1,4 +1,4 @@
-package app.diandi.db
+package com.mianbizhe.diandiji.db
 
 import androidx.room.Dao
 import androidx.room.Insert
@@ -37,4 +37,15 @@ interface NotificationDao {
             "ORDER BY postTime DESC LIMIT :limit"
     )
     suspend fun recentByPackages(packages: Set<String>, limit: Int): List<NotificationEntity>
+
+    /** 消费回填：水位 id 之后的财务通知，按 id 升序 */
+    @Query(
+        "SELECT * FROM notification_history WHERE packageName IN (:packages) " +
+            "AND id > :afterId ORDER BY id ASC"
+    )
+    suspend fun financeAfterId(packages: Set<String>, afterId: Long): List<NotificationEntity>
+
+    /** 清理指定包名的存量记录（配合采集层 DROP_PACKAGES，一次性） */
+    @Query("DELETE FROM notification_history WHERE packageName IN (:packages)")
+    suspend fun deleteByPackages(packages: Set<String>): Int
 }
