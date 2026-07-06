@@ -5,9 +5,28 @@ plugins {
     alias(libs.plugins.room)
 }
 
+// 签名：在 ~/.gradle/gradle.properties 或 local.properties 或 CI 环境变量中设置
+// 字段：signStoreFile, signStorePassword, signKeyAlias, signKeyPassword
+val signFile   = extra.properties.getOrDefault("signStoreFile", null) as? String
+    ?: findProperty("signStoreFile") as? String
+val signPass   = findProperty("signStorePassword") as? String
+val signAlias  = findProperty("signKeyAlias") as? String
+val signKey    = findProperty("signKeyPassword") as? String
+
 android {
     namespace = "com.mianbizhe.diandiji"
     compileSdk = 34
+
+    signingConfigs {
+        if (!signFile.isNullOrBlank()) {
+            create("release") {
+                storeFile = file(signFile!!)
+                storePassword = signPass
+                keyAlias = signAlias
+                keyPassword = signKey
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.mianbizhe.diandiji"
@@ -19,8 +38,8 @@ android {
 
     buildTypes {
         release {
-            // demo 阶段先不混淆，避免 Ktor 反射被裁；正式版再配 R8 规则
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
