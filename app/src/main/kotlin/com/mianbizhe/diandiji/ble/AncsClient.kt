@@ -75,9 +75,26 @@ class AncsClient(
         val CHAR_DATA_SOURCE   = UUID.fromString("22EAC6E9-24D6-4BB5-BE44-B36ACE7C7BFB")
         val CCCD               = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 
-        // 自定义配对服务（Phase 1 Android 当外设时广播）。UUID 自定，与 ANCS 无关。
-        val SERVICE_PAIR = UUID.fromString("E0A1E000-0000-1000-8000-00805F9B34FB")
-        val CHAR_PAIR    = UUID.fromString("E0A1E001-0000-1000-8000-00805F9B34FB")
+        // 自定义配对服务（Phase 1 Android 当外设时广播）。
+        // 首次启动为每台设备随机生成唯一 UUID，持久化到 SharedPreferences，
+        // 后续同一设备始终用同一个（不同设备之间不冲突）。
+        private const val KEY_PAIR_SVC_UUID = "pair_service_uuid"
+        private const val KEY_PAIR_CHR_UUID = "pair_char_uuid"
+
+        private fun initPairUuids(prefs: android.content.SharedPreferences): Pair<UUID, UUID> {
+            val svc = prefs.getString(KEY_PAIR_SVC_UUID, null)
+            val chr = prefs.getString(KEY_PAIR_CHR_UUID, null)
+            if (svc != null && chr != null) {
+                return UUID.fromString(svc) to UUID.fromString(chr)
+            }
+            val newSvc = UUID.randomUUID()
+            val newChr = UUID.randomUUID()
+            prefs.edit()
+                .putString(KEY_PAIR_SVC_UUID, newSvc.toString())
+                .putString(KEY_PAIR_CHR_UUID, newChr.toString())
+                .apply()
+            return newSvc to newChr
+        }
 
         // ANCS CategoryID 枚举
         val CATEGORIES = mapOf(
@@ -167,8 +184,16 @@ class AncsClient(
         (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager)
     private val bt: BluetoothAdapter = manager.adapter
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    // 配对服务 UUID：每台设备首次启动时随机生成，持久化后固定使用
+    private val pairServiceUuid: UUID
+    private val pairCharUuid: UUID
+    val serviceUuid: String get() = pairServiceUuid.toString()
+    val charUuid: String get() = pairCharUuid.toString()
 
     init {
+        val (svc, chr) = initPairUuids(prefs)
+        pairServiceUuid = svc
+        pairCharUuid = chr
         try {
             context.registerReceiver(bondReceiver, IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED))
             receiverRegistered = true
@@ -231,12 +256,12 @@ class AncsClient(
                 return
             }
             val pairChar = BluetoothGattCharacteristic(
-                CHAR_PAIR,
+                pairCharUuid,
                 BluetoothGattCharacteristic.PROPERTY_READ,
                 // 加密权限：iPhone 读取时强制走配对
                 BluetoothGattCharacteristic.PERMISSION_READ_ENCRYPTED,
             )
-            val service = BluetoothGattService(SERVICE_PAIR, BluetoothGattService.SERVICE_TYPE_PRIMARY).apply {
+            val service = BluetoothGattService(pairServiceUuid, BluetoothGattService.SERVICE_TYPE_PRIMARY).apply {
                 addCharacteristic(pairChar)
             }
             server.addService(service)
@@ -254,7 +279,7 @@ class AncsClient(
             .setIncludeDeviceName(true)
             .build()
         val scanResp = AdvertiseData.Builder()
-            .addServiceUuid(android.os.ParcelUuid(SERVICE_PAIR))
+            .addServiceUuid(android.os.ParcelUuid(pairServiceUuid))
             .build()
         try {
             advertiser.startAdvertising(settings, advData, scanResp, advertiseCallback)
@@ -595,8 +620,13 @@ class AncsClient(
 
         override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
             log("MTU changed: $mtu (status=$status)")
-            if (status == BluetoothGatt.GATT_SUCCESS) onMtuReady(g)
-            else { lastError = "MTU 协商失败 status=$status"; setState(State.IDLE, lastError!!) }
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                onMtuReady(g)
+            } else {
+                // iOS 经常拒绝 requestMtu(512)；不致命，用默认 MTU 继续
+                Log.w(TAG, "MTU negotiation failed (status=$status), proceeding with default")
+                onMtuReady(g)
+            }
         }
 
         override fun onCharacteristicChanged(g: BluetoothGatt, char: BluetoothGattCharacteristic) {

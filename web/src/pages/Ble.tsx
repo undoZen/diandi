@@ -9,6 +9,7 @@ interface BleStatus {
   isSubscribed?: boolean;
   deviceName?: string | null;
   pairedAddress?: string | null;
+  pairServiceUuid?: string | null;
   lastError?: string | null;
 }
 
@@ -138,6 +139,12 @@ export default function Ble() {
           <span className="text-xs text-ink-muted">已配对地址</span>
           <span className="text-xs font-mono text-ink-muted break-all">{status.pairedAddress || '-'}</span>
         </div>
+        {status.pairServiceUuid && (
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-ink-muted">服务 UUID</span>
+            <span className="text-xs font-mono text-ink-muted break-all select-all">{status.pairServiceUuid}</span>
+          </div>
+        )}
       </div>
 
       {/* error box */}

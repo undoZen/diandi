@@ -201,6 +201,7 @@ class WebServerService : Service() {
                             put("isSubscribed", c?.isSubscribed ?: false)
                             put("deviceName", c?.deviceName)
                             put("pairedAddress", c?.pairedAddress)
+                            put("pairServiceUuid", c?.serviceUuid)
                             put("lastError", c?.lastError)
                         }.toString(), ContentType.Application.Json)
                     }
