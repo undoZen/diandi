@@ -79,9 +79,12 @@ room {
 // diandi/app（无 android/ 目录），会错找成上级 mbti/node_modules，故显式指定三个路径。
 react {
     autolinkLibrariesWithApp()
+    root = rootProject.layout.projectDirectory.asFile
     reactNativeDir = rootProject.file("node_modules/react-native")
     codegenDir = rootProject.file("node_modules/@react-native/codegen")
-    cliFile = rootProject.file("node_modules/react-native/cli.js")
+    cliFile = rootProject.file("node_modules/@react-native-community/cli/build/bin.js")
+    entryFile = rootProject.file("mobile/index.js")
+    bundleConfig = rootProject.file("mobile/metro.config.js")
 }
 
 dependencies {
