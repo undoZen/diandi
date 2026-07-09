@@ -39,7 +39,7 @@ object Pages {
                 <p>设备：${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE})</p>
                 <p>局域网访问：<code>$lanUrl</code></p>
                 <p>页面生成时间：$now</p>
-                <p><a href="/spending">→ 消费</a>　<a href="/dashboard">→ 统计</a>　<a href="/notifications">→ 通知历史</a></p>
+                <p><a href="/spending">→ 消费</a>　<a href="/dashboard">→ 统计</a>　<a href="/notifications">→ 通知历史</a>　<a href="/ble">→ BLE/iOS</a></p>
               </div>
             </body>
             </html>
@@ -89,6 +89,7 @@ object Pages {
           <header>
             <h1>&#128276; 通知历史</h1>
             <span class="count" id="count"></span>
+            <a href="/ble">BLE</a>
             <a href="/spending">消费</a>
           </header>
           <nav id="filters">
@@ -217,6 +218,7 @@ object Pages {
             <span class="count" id="count"></span>
             <a href="#" id="btnManual" style="color:#d4a017;font-weight:600;text-decoration:none">＋录入</a>
             <a href="/dashboard">统计</a>
+            <a href="/ble">BLE</a>
             <a href="/notifications" style="margin-left:.8rem">通知</a>
           </header>
           <div id="days"></div>
@@ -613,6 +615,173 @@ object Pages {
               b.addEventListener('click', function () { curDays = +b.getAttribute('data-days'); });
             });
             load(curDays);
+          </script>
+        </body>
+        </html>
+    """.trimIndent()
+
+    /**
+     * BLE ANCS 控制页：扫描 → 选择 iPhone → 连接 → 观察通知到达。
+     * 纯 API 驱动 `/api/ble/` 端点，不依赖任何库。
+     */
+    fun bleControl(): String = """
+        <!DOCTYPE html>
+        <html lang="zh-CN">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>点滴集 · BLE / iPhone</title>
+          <style>
+            :root { color-scheme: dark; }
+            body { font-family: system-ui, sans-serif; margin: 0; background: #14181d; color: #e8eaed; }
+            header { position: sticky; top: 0; z-index: 10; background: #1c2128; padding: .8rem 1rem;
+                     display: flex; align-items: baseline; gap: .8rem; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+            header h1 { font-size: 1.1rem; margin: 0; }
+            header a { margin-left: auto; color: #8fd3ff; font-size: .85rem; text-decoration: none; }
+            .wrap { max-width: 600px; margin: 0 auto; padding: .8rem; }
+            .card { background: #1c2128; border-radius: 10px; padding: .7rem .9rem; margin-bottom: .5rem; }
+            .row { display: flex; justify-content: space-between; align-items: center; gap: .6rem; }
+            .label { opacity: .65; font-size: .85rem; }
+            .value { font-weight: 600; }
+            .ok { color: #8fd8a8; }
+            .warn { color: #d4a017; }
+            .off { color: #e05555; }
+            button { font: inherit; font-size: .85rem; padding: .4rem .9rem; border-radius: 8px; border: none; }
+            .btn-primary { background: #2d5a88; color: #fff; }
+            .btn-primary:disabled { opacity: .4; }
+            .btn-danger { background: #5a2d2d; color: #e8a8a8; }
+            .btn-outline { background: transparent; border: 1px solid #2d3644; color: #a9c7e8; }
+            h2 { font-size: .85rem; opacity: .7; margin: 1rem 0 .4rem; }
+            .devlist { list-style: none; margin: 0; padding: 0; }
+            .devlist li { padding: .5rem .7rem; border-radius: 8px; background: #22262d; margin-bottom: .3rem;
+                         display: flex; justify-content: space-between; align-items: center; }
+            .devlist li .name { font-weight: 500; }
+            .devlist li .addr { font-size: .7rem; opacity: .5; font-family: monospace; }
+            .log { margin-top: .8rem; background: #0d1116; border-radius: 8px; padding: .5rem .7rem;
+                   font-family: monospace; font-size: .75rem; max-height: 200px; overflow-y: auto; }
+            .log div { opacity: .75; margin-bottom: .2rem; }
+            .log .evt { color: #8fd3ff; }
+            .log .err { color: #e05555; }
+            .log .ok { color: #8fd8a8; }
+            .step { font-size: .8rem; opacity: .8; line-height: 1.5; margin: .3rem 0 .6rem; }
+            .step b { color: #8fd3ff; }
+            .errbox { background: #3a2222; color: #e8a8a8; border-radius: 8px; padding: .5rem .7rem; font-size: .8rem; margin-bottom: .5rem; }
+          </style>
+        </head>
+        <body>
+          <header>
+            <h1>&#128293; BLE / iPhone</h1>
+            <a href="/spending">消费</a>
+          </header>
+          <div class="wrap">
+            <!-- 状态 -->
+            <div class="card">
+              <div class="row"><span class="label">状态</span><span class="value" id="bleState">检查中…</span></div>
+              <div class="row" style="margin-top:.4rem"><span class="label">设备</span><span class="value" id="bleDevice">-</span></div>
+              <div class="row" style="margin-top:.4rem"><span class="label">已配对地址</span><span class="value" id="blePaired" style="font-family:monospace;font-size:.75rem">-</span></div>
+            </div>
+            <div id="errbox" class="errbox" hidden></div>
+
+            <!-- 第一步：广播配对 -->
+            <h2>第 1 步 · 配对（仅首次需要）</h2>
+            <div class="step">
+              点「开始广播」→ 拿起 <b>iPhone</b> 打开 <b>设置 → 蓝牙</b>→ 在列表里找到
+              <b>diandi</b>（或本机名）→ 点一下配对。iPhone 弹配对确认就成。
+            </div>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
+              <button class="btn-primary" id="btnPair" onclick="pairStart()">开始广播</button>
+              <button class="btn-outline" id="btnPairStop" onclick="pairStop()" hidden>停止广播</button>
+            </div>
+
+            <!-- 第二步：连接 ANCS -->
+            <h2>第 2 步 · 连接采集</h2>
+            <div class="step">
+              配对成功后点「连接 iPhone」。成功后 iPhone 通知会实时进「通知历史」。
+            </div>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
+              <button class="btn-primary" id="btnConn" onclick="connect()">连接 iPhone</button>
+              <button class="btn-danger" id="btnDisc" onclick="disconnect()" hidden>断开</button>
+            </div>
+
+            <!-- 已配对设备（兜底手动选） -->
+            <div id="bondedSection" hidden>
+              <h2>系统已配对设备（点选连接）</h2>
+              <ul class="devlist" id="bondlist"></ul>
+            </div>
+
+            <h2>日志</h2>
+            <div class="log" id="log"></div>
+          </div>
+          <script>
+            function log(msg, cls) {
+              var div = document.createElement('div');
+              div.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+              if (cls) div.className = cls;
+              var el = document.getElementById('log');
+              el.appendChild(div); el.scrollTop = el.scrollHeight;
+            }
+            function esc(s) { return String(s == null ? '' : s).replace(/[&<>]/g,'?'); }
+
+            function stateStr(s) {
+              if (s.isSubscribed)  return '<span class="value ok">&#9679; ANCS 已订阅</span>';
+              if (s.isConnected)   return '<span class="value warn">&#9679; 已连接（订阅中）</span>';
+              if (s.isAdvertising) return '<span class="value warn">&#9679; 广播中（去 iPhone 配对）</span>';
+              return '<span class="value off">&#9679; 空闲</span>';
+            }
+
+            function fetchStatus() {
+              fetch('/api/ble/status').then(function (r) { return r.json(); }).then(function (s) {
+                document.getElementById('bleState').innerHTML = stateStr(s);
+                document.getElementById('bleDevice').textContent = s.deviceName || '-';
+                document.getElementById('blePaired').textContent = s.pairedAddress || '-';
+                var eb = document.getElementById('errbox');
+                if (s.lastError) { eb.textContent = s.lastError; eb.hidden = false; } else { eb.hidden = true; }
+                var busy = s.isAdvertising || s.isConnected;
+                document.getElementById('btnPair').hidden = s.isAdvertising;
+                document.getElementById('btnPairStop').hidden = !s.isAdvertising;
+                document.getElementById('btnConn').disabled = busy || !s.pairedAddress;
+                document.getElementById('btnDisc').hidden = !s.isConnected;
+                if (s.isSubscribed) log('ANCS 订阅成功，iPhone 通知正在落库', 'ok');
+              }).catch(function (e) { log('status fetch failed: ' + e.message, 'err'); });
+            }
+
+            function pairStart() {
+              fetch('/api/ble/pair/start', { method: 'POST' }).then(function (r) { return r.json(); }).then(function (d) {
+                if (d.error) log('广播失败: ' + d.error, 'err'); else log('开始广播，去 iPhone 配对', 'evt');
+                fetchStatus();
+              });
+            }
+            function pairStop() {
+              fetch('/api/ble/pair/stop', { method: 'POST' }).then(function () { log('已停止广播', 'evt'); fetchStatus(); });
+            }
+            function connect(addr) {
+              var body = addr ? JSON.stringify({ address: addr }) : '{}';
+              fetch('/api/ble/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body })
+                .then(function (r) { return r.json(); }).then(function () {
+                  log('正在连接 iPhone ANCS…', 'evt'); fetchStatus();
+                });
+            }
+            function disconnect() {
+              fetch('/api/ble/disconnect', { method: 'POST' }).then(function () { log('已断开', 'evt'); fetchStatus(); });
+            }
+
+            function fetchBonded() {
+              fetch('/api/ble/bonded').then(function (r) { return r.json(); }).then(function (list) {
+                if (!list || !list.length) { document.getElementById('bondedSection').hidden = true; return; }
+                document.getElementById('bondedSection').hidden = false;
+                var html = '';
+                list.forEach(function (d) {
+                  html += '<li><div><div class="name">' + esc(d.name) + '</div>'
+                    + '<div class="addr">' + esc(d.address) + '</div></div>'
+                    + '<button class="btn-outline" onclick="connect(\'' + d.address + '\')">连接</button></li>';
+                });
+                document.getElementById('bondlist').innerHTML = html;
+              });
+            }
+
+            setInterval(fetchStatus, 3000);
+            fetchStatus(); fetchBonded();
+            log('BLE 页就绪。先点「开始广播」，再去 iPhone 蓝牙设置里配对。', 'evt');
           </script>
         </body>
         </html>

@@ -22,8 +22,12 @@ object SpendPipeline {
     /** 去重时间窗：同一笔交易两条通知的最大间隔 */
     private const val DEDUP_WINDOW_MS = 3 * 60 * 1000L
 
-    /** 唯一会互发重复通知的组合：招行 App + 掌上生活（同一张信用卡） */
-    private val CMB_PAIR = setOf("cmb.pb", "com.cmbchina.ccd.pluto.cmbActivity")
+    /** 唯一会互发重复通知的组合：招行 App + 掌上生活 + iPhone 招行（同一张信用卡） */
+    private val CMB_PAIR = setOf(
+        "cmb.pb",
+        "com.cmbchina.ccd.pluto.cmbActivity",
+        "com.cmbchina.MPBBank",
+    )
 
     /** 串行化处理：防止招行+掌上生活双通知并发入库导致去重失效 */
     private val mutex = Mutex()
@@ -34,13 +38,13 @@ object SpendPipeline {
         Classifier.ensureLoaded(context)
         val dao = AppDatabase.get(context).spendingDao()
 
-        // ---- 去重：同金额 ±3 分钟内、且恰好是招行双 App 组合 ----
+        // ---- 去重：同金额 ±3 分钟内、且两个包名都在招行系（招行/掌上生活/iPhone招行） ----
         var hidden = false
         val twins = dao.findDedupCandidates(
             parsed.amountCents, e.postTime - DEDUP_WINDOW_MS, e.postTime + DEDUP_WINDOW_MS,
         ).filter {
             it.sourcePackage != e.packageName &&
-                setOf(it.sourcePackage, e.packageName) == CMB_PAIR
+                it.sourcePackage in CMB_PAIR && e.packageName in CMB_PAIR
         }
         for (twin in twins) {
             if (parsed.merchant != null && twin.merchant == null) {

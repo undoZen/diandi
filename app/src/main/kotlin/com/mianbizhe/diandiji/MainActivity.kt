@@ -54,6 +54,12 @@ class MainActivity : Activity() {
             // 厂商自启动 + 后台弹出界面权限（ColorOS 同页）；全屏提醒可靠性靠它
             KeepAlive.openAutoStartSettings(this)
         }
+        findViewById<Button>(R.id.btn_ble_perms).setOnClickListener {
+            startActivity(
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(Uri.parse("package:$packageName"))
+            )
+        }
         findViewById<Button>(R.id.btn_refresh).setOnClickListener {
             loadHome()
         }
@@ -88,6 +94,24 @@ class MainActivity : Activity() {
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+        }
+        // BLE 权限运行时授权
+        // API 31+ 需要 BLUETOOTH_SCAN + BLUETOOTH_CONNECT + BLUETOOTH_ADVERTISE（ANCS 配对要当外设广播）
+        // ColorOS 额外需要 ACCESS_FINE_LOCATION（即使 Android 声明不再需要）
+        val needBle = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= 31) {
+            if (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED)
+                needBle += Manifest.permission.BLUETOOTH_SCAN
+            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED)
+                needBle += Manifest.permission.BLUETOOTH_CONNECT
+            if (checkSelfPermission(Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager.PERMISSION_GRANTED)
+                needBle += Manifest.permission.BLUETOOTH_ADVERTISE
+        }
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            needBle += Manifest.permission.ACCESS_FINE_LOCATION
+        }
+        if (needBle.isNotEmpty()) {
+            requestPermissions(needBle.toTypedArray(), 2)
         }
     }
 

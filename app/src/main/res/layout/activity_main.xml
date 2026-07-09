@@ -57,6 +57,16 @@
                 android:text="自启动" />
 
             <Button
+                android:id="@+id/btn_ble_perms"
+                style="@android:style/Widget.Material.Button.Borderless.Small"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:textColor="#8fd3ff"
+                android:text="BLE 权限" />
+
+            <Button
                 android:id="@+id/btn_refresh"
                 style="@android:style/Widget.Material.Button.Borderless.Small"
                 android:layout_width="0dp"

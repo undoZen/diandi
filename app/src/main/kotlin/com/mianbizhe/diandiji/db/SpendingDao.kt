@@ -39,6 +39,10 @@ interface SpendingDao {
     @Query("UPDATE spending SET hidden = 1 WHERE id = :id")
     suspend fun markHidden(id: Long)
 
+    /** 清理：隐藏 iPhone 招行来源、无商户的消费记录（与 Android 端重复） */
+    @Query("UPDATE spending SET hidden = 1 WHERE sourcePackage = 'com.cmbchina.MPBBank' AND merchant IS NULL AND hidden = 0")
+    suspend fun hideEmptyCmbs()
+
     /** 回填水位：已处理过的最大通知 id */
     @Query("SELECT MAX(notificationId) FROM spending")
     suspend fun maxNotificationId(): Long?

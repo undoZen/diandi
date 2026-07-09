@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import com.mianbizhe.diandiji.alert.AlertGate
+import com.mianbizhe.diandiji.ble.AncsClient
 import com.mianbizhe.diandiji.classify.Classifier
 import com.mianbizhe.diandiji.db.AppDatabase
 import com.mianbizhe.diandiji.db.CorrectionEntity
@@ -144,6 +145,9 @@ class WebServerService : Service() {
     @Volatile
     private var backfillStarted = false
 
+    // ---- BLE ANCS（iPhone 通知采集） ----
+    private var ancsClient: AncsClient? = null
+
     /** 包名 → App 显示名缓存（查 PackageManager 不便宜，通知列表会高频用） */
     private val appLabelCache = ConcurrentHashMap<String, String>()
 
@@ -182,6 +186,61 @@ class WebServerService : Service() {
                             ContentType.Application.Json,
                         )
                     }
+                    get("/ble") {
+                        call.respondText(Pages.bleControl(), ContentType.Text.Html)
+                    }
+                    // ---- BLE ANCS（iPhone 通知） ----
+                    get("/api/ble/status") {
+                        val c = ancsClient
+                        call.respondText(JSONObject().apply {
+                            put("state", c?.state?.name ?: "IDLE")
+                            put("isAdvertising", c?.isAdvertising ?: false)
+                            put("isConnected", c?.isConnected ?: false)
+                            put("isSubscribed", c?.isSubscribed ?: false)
+                            put("deviceName", c?.deviceName)
+                            put("pairedAddress", c?.pairedAddress)
+                            put("lastError", c?.lastError)
+                        }.toString(), ContentType.Application.Json)
+                    }
+                    post("/api/ble/pair/start") {
+                        val c = ancsClient
+                        if (c == null) {
+                            call.respondText("""{"error":"ANCS not initialized"}""",
+                                ContentType.Application.Json, HttpStatusCode.InternalServerError)
+                            return@post
+                        }
+                        try {
+                            c.startPairing()
+                            call.respondText("""{"advertising":true}""", ContentType.Application.Json)
+                        } catch (e: Throwable) {
+                            call.respondText("""{"error":"${e.javaClass.simpleName}: ${e.message?.replace("\"","'")}"}""",
+                                ContentType.Application.Json, HttpStatusCode.InternalServerError)
+                        }
+                    }
+                    post("/api/ble/pair/stop") {
+                        ancsClient?.stopPairing()
+                        call.respondText("""{"advertising":false}""", ContentType.Application.Json)
+                    }
+                    get("/api/ble/bonded") {
+                        val list = (ancsClient?.getBondedDevices() ?: emptyList()).map { JSONObject(it) }
+                        call.respondText(JSONArray(list).toString(), ContentType.Application.Json)
+                    }
+                    // 连接已配对的 iPhone 读 ANCS；body 可选 address，缺省用 pairedAddress
+                    post("/api/ble/connect") {
+                        val body = runCatching { JSONObject(call.receiveText()) }.getOrNull()
+                        val addr = body?.optString("address")?.takeIf { it.isNotBlank() }
+                        ancsClient?.connectAncs(addr)
+                        call.respondText("""{"connecting":true}""", ContentType.Application.Json)
+                    }
+                    post("/api/ble/disconnect") {
+                        ancsClient?.disconnect()
+                        call.respondText("""{"disconnected":true}""", ContentType.Application.Json)
+                    }
+                    get("/api/ble/logs") {
+                        val logs = ancsClient?.getLogs() ?: emptyList()
+                        call.respondText(JSONArray(logs).toString(), ContentType.Application.Json)
+                    }
+
                     // 里程碑 2 验证用：确认通知在落库
                     get("/api/notifications/count") {
                         val dao = AppDatabase.get(this@WebServerService).notificationDao()
@@ -411,6 +470,12 @@ class WebServerService : Service() {
                         onCollect(this@WebServerService, isSpending = true)
                         call.respondText(spendingJson(dao.get(id)!!).toString(), ContentType.Application.Json)
                     }
+                    // 清理无商户的招行重复消费（debug 用）
+                    post("/api/spending/cleanup") {
+                        val dao = AppDatabase.get(this@WebServerService).spendingDao()
+                        dao.hideEmptyCmbs()
+                        call.respondText("""{"hidden":true}""", ContentType.Application.Json)
+                    }
                     // 数据导出：全量 dump notification_history + spending + category_correction
                     get("/api/export") {
                         val db = AppDatabase.get(this@WebServerService)
@@ -566,6 +631,50 @@ class WebServerService : Service() {
                 }
             }.also { it.start(wait = false) }
         }
+        // 初始化 ANCS BLE 客户端（后台等指令，不自动连接）
+        if (ancsClient == null) {
+            ancsClient = AncsClient(
+                context = this,
+                onNotification = { entity ->
+                    scope.launch {
+                        try {
+                            val dao = AppDatabase.get(this@WebServerService).notificationDao()
+                            if (dao.lastContentHash(entity.sbnKey) != entity.contentHash) {
+                                val insertedId = dao.insert(entity)
+                                val withId = entity.copy(id = insertedId)
+                                // 更新前台通知计数
+                                onCollect(this@WebServerService, isSpending = false)
+                                Log.i(TAG, "ANCS stored: ${entity.packageName} / ${entity.title?.take(40)}")
+                                // 全屏提醒（如信用卡消费）
+                                if (AlertGate.shouldAlert(withId)) {
+                                    AlertGate.fireAlert(this@WebServerService, withId)
+                                }
+                                // 走消费管线：SpendParser 按文本判断是否消费，
+                                // 不依赖包名白名单（iOS bundle ID 与 Android 不同，白名单会漏）
+                                try {
+                                    val created = SpendPipeline.process(this@WebServerService, withId)
+                                    if (created) {
+                                        onCollect(this@WebServerService, isSpending = true)
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "ANCS spend pipeline failed", e)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "ANCS insert failed", e)
+                        }
+                    }
+                },
+                onStatus = { msg -> Log.i(TAG, "ANCS: $msg") },
+            )
+        }
+        // 已配对则自动连 ANCS（autoConnect=true：iPhone 可达时由系统自动连上）
+        ancsClient?.let { c ->
+            if (!c.pairedAddress.isNullOrEmpty() && c.state == AncsClient.State.IDLE) {
+                Log.i(TAG, "ANCS: paired address found, auto-connecting")
+                c.connectAncs(autoConnect = true)
+            }
+        }
         isRunning = true
         return START_STICKY
     }
@@ -638,6 +747,8 @@ class WebServerService : Service() {
 
     override fun onDestroy() {
         isRunning = false
+        ancsClient?.close()
+        ancsClient = null
         stopNetworkMonitor()
         scope.cancel()
         server?.stop(gracePeriodMillis = 500, timeoutMillis = 1500)

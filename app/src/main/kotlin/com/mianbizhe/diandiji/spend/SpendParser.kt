@@ -168,18 +168,12 @@ object SpendParser {
         if (REJECT.containsMatchIn("${e.title.orEmpty()} $raw")) return null
         val text = normalize(raw)
 
-        val (merchant, amountStr) = when (e.packageName) {
-            "cmb.pb" -> {
-                CMB_QUICK.find(text)?.let { it.groupValues[1] to it.groupValues[2] }
-                    ?: CMB_CARD.find(text)?.let { null to it.groupValues[1] }
-                    ?: return null
-            }
-            "com.cmbchina.ccd.pluto.cmbActivity" ->
-                CMB_LIFE.find(text)?.let { it.groupValues[1] to it.groupValues[2] } ?: return null
-            "com.icbc" ->
-                ICBC.find(text)?.let { it.groupValues[1] to it.groupValues[2] } ?: return null
-            else -> return null
-        }
+        // 按文本内容匹配银行格式（不限包名，iOS bundle ID / 微信转发均覆盖）
+        val (merchant, amountStr) = CMB_QUICK.find(text)?.let { it.groupValues[1] to it.groupValues[2] }
+            ?: CMB_CARD.find(text)?.let { null to it.groupValues[1] }
+            ?: CMB_LIFE.find(text)?.let { it.groupValues[1] to it.groupValues[2] }
+            ?: ICBC.find(text)?.let { it.groupValues[1] to it.groupValues[2] }
+            ?: return null
 
         val cents = toCents(amountStr) ?: return null
         return ParsedSpend(
