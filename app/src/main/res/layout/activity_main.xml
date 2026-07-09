@@ -67,6 +67,16 @@
                 android:text="BLE 权限" />
 
             <Button
+                android:id="@+id/btn_notifications"
+                style="@android:style/Widget.Material.Button.Borderless.Small"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:textColor="#f0b429"
+                android:text="通知" />
+
+            <Button
                 android:id="@+id/btn_refresh"
                 style="@android:style/Widget.Material.Button.Borderless.Small"
                 android:layout_width="0dp"

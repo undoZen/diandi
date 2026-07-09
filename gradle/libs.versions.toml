@@ -1,9 +1,12 @@
 [versions]
 agp = "8.7.3"
-kotlin = "2.1.10"
+# Kotlin 钉在 2.0.21 而非 2.1.x：React Native 0.75.5 的 gradle 插件按旧 KGP 编译，
+# Kotlin 2.1.0 把 KotlinTopLevelExtension 从 class 改成 interface，二进制不兼容。
+# 升 RN 0.76+（支持 Kotlin 2.1）需 compileSdk 35，与本项目钉 34 + Room 2.6.1 冲突。
+kotlin = "2.0.21"
 ktor = "3.1.1"
 # KSP 版本前半段必须与 Kotlin 版本一致
-ksp = "2.1.10-1.0.31"
+ksp = "2.0.21-1.0.28"
 # Room 2.7+ 要求 compileSdk 35（本机只装了 platform-34），暂钉 2.6.1；升 35 时一并升
 room = "2.6.1"
 

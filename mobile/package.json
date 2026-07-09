@@ -1,0 +1,23 @@
+{
+  "name": "@diandi/mobile",
+  "private": true,
+  "scripts": {
+    "start": "react-native start",
+    "bundle:dev": "react-native bundle --platform android --dev true --entry-file index.js --bundle-output ../app/src/main/assets/index.android.bundle",
+    "bundle:release": "react-native bundle --platform android --dev false --entry-file index.js --bundle-output ../app/src/main/assets/index.android.bundle"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-native": "0.75.5",
+    "@diandi/shared": "*"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/runtime": "^7.25.0",
+    "@react-native/babel-preset": "0.75.5",
+    "@types/react": "^18.3.0",
+    "typescript": "^5.5.0",
+    "@react-native/typescript-config": "^0.75.0",
+    "@react-native/metro-config": "^0.75.0"
+  }
+}

@@ -27,7 +27,7 @@ class MainActivity : Activity() {
     private lateinit var statusText: TextView
     private lateinit var webView: WebView
 
-    private val homeUrl get() = "http://127.0.0.1:${WebServerService.PORT}/spending"
+    private val homeUrl get() = "http://127.0.0.1:${WebServerService.PORT}/"
     private var loadFailed = false
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -59,6 +59,9 @@ class MainActivity : Activity() {
                 Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
                     .setData(Uri.parse("package:$packageName"))
             )
+        }
+        findViewById<Button>(R.id.btn_notifications).setOnClickListener {
+            startActivity(Intent(this, NotificationsActivity::class.java))
         }
         findViewById<Button>(R.id.btn_refresh).setOnClickListener {
             loadHome()

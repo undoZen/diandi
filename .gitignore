@@ -12,3 +12,15 @@ captures/
 *.aab
 keystore.properties
 *.jks
+
+# JS / React Native / Vite 生成物与依赖
+node_modules/
+web/dist/
+app/src/main/assets/web/
+app/src/main/assets/index.android.bundle
+autolinking.json
+.react-native/
+metro-cache/
+
+# macOS
+.DS_Store

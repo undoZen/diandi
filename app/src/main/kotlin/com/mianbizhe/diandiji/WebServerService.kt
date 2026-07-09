@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.res.AssetManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -29,6 +30,7 @@ import io.ktor.server.cio.CIO
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.request.receiveText
+import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -40,6 +42,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
+import java.io.FileNotFoundException
 import java.net.NetworkInterface
 import java.util.concurrent.ConcurrentHashMap
 
@@ -142,6 +146,9 @@ class WebServerService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
+    /** React Web 构建产物目录（首次启动从 assets/web/ 复制到 cacheDir/web/） */
+    private lateinit var webDir: File
+
     @Volatile
     private var backfillStarted = false
 
@@ -161,6 +168,7 @@ class WebServerService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        prepareWebAssets()
         PORT = findAvailablePort()
         startForeground(NOTIFICATION_ID, buildNotification())
         startNetworkMonitor()
@@ -177,17 +185,11 @@ class WebServerService : Service() {
                         Classifier.ensureLoaded(this@WebServerService)
                         call.respondText(Classifier.exportModel(), ContentType.Application.Json)
                     }
-                    get("/") {
-                        call.respondText(Pages.index(lanUrl), ContentType.Text.Html)
-                    }
                     get("/api/ping") {
                         call.respondText(
                             """{"status":"ok","time":${System.currentTimeMillis()},"uptimeMs":${System.currentTimeMillis() - startedAt}}""",
                             ContentType.Application.Json,
                         )
-                    }
-                    get("/ble") {
-                        call.respondText(Pages.bleControl(), ContentType.Text.Html)
                     }
                     // ---- BLE ANCS（iPhone 通知） ----
                     get("/api/ble/status") {
@@ -311,17 +313,7 @@ class WebServerService : Service() {
                         }
                         call.respondText(arr.toString(), ContentType.Application.Json)
                     }
-                    get("/notifications") {
-                        call.respondText(Pages.notifications(), ContentType.Text.Html)
-                    }
 
-                    // ---- 消费（/spending）----
-                    get("/spending") {
-                        call.respondText(Pages.spending(), ContentType.Text.Html)
-                    }
-                    get("/dashboard") {
-                        call.respondText(Pages.dashboard(), ContentType.Text.Html)
-                    }
                     get("/api/spending") {
                         Classifier.ensureLoaded(this@WebServerService)
                         val limit = call.request.queryParameters["limit"]
@@ -628,6 +620,22 @@ class WebServerService : Service() {
                             )
                         }
                     }
+
+                    // ---- React SPA 静态文件 + 前端路由 fallback（放在最后，不影响 /api/*）----
+                    get("{...}") {
+                        val path = call.request.local.uri.substringBefore('?').removePrefix("/")
+                        val file = File(webDir, path.ifEmpty { "index.html" })
+                        if (file.exists() && file.isFile) {
+                            call.respondBytes(file.readBytes(), contentTypeFor(file.name))
+                        } else {
+                            val indexFile = File(webDir, "index.html")
+                            if (indexFile.exists()) {
+                                call.respondText(indexFile.readText(), ContentType.Text.Html)
+                            } else {
+                                call.respondText(Pages.index(lanUrl), ContentType.Text.Html)
+                            }
+                        }
+                    }
                 }
             }.also { it.start(wait = false) }
         }
@@ -788,4 +796,69 @@ class WebServerService : Service() {
     }
 
     private fun buildNotification(): Notification = buildNotificationStatic(this, "正在准备关注通知后续记录")
+
+    // ---- Web 资产：首次启动从 APK assets/web/ 复制到 cacheDir，Ktor 从文件系统 serve ----
+
+    /** 首次启动时将 assets/web/ 复制到 cacheDir/web/，后续 Ktor 从文件系统 serve */
+    private fun prepareWebAssets() {
+        webDir = File(cacheDir, "web")
+        val versionFile = File(webDir, ".version")
+        val currentVersion = try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: "0"
+        } catch (_: Exception) { "0" }
+        val needsCopy = !versionFile.exists() || versionFile.readText() != currentVersion
+
+        if (!needsCopy) {
+            Log.d(TAG, "web assets up to date at ${webDir.absolutePath}")
+            return
+        }
+
+        try {
+            webDir.mkdirs()
+            webDir.listFiles()?.forEach { if (it.name != ".version") it.deleteRecursively() }
+            copyAssets(assets, "", webDir)
+            versionFile.writeText(currentVersion)
+            Log.i(TAG, "web assets copied to ${webDir.absolutePath}")
+        } catch (e: Exception) {
+            Log.w(TAG, "failed to copy web assets: ${e.message}. Will fall back to old HTML pages.")
+        }
+    }
+
+    /** 递归复制 assets 子目录到目标文件系统 */
+    private fun copyAssets(assets: AssetManager, srcPath: String, destDir: File) {
+        val path = srcPath.removePrefix("/").trim('/')
+        try {
+            val list = assets.list(if (path.isEmpty()) "web" else path) ?: return
+            if (list.isEmpty()) return
+            for (name in list) {
+                val childPath = if (path.isEmpty()) "web/$name" else "$path/$name"
+                val destFile = File(destDir, name)
+                try {
+                    assets.open(childPath).use { input ->
+                        destFile.parentFile?.mkdirs()
+                        destFile.outputStream().use { output -> input.copyTo(output) }
+                    }
+                } catch (_: FileNotFoundException) {
+                    destFile.mkdirs()
+                    copyAssets(assets, childPath, destFile)
+                }
+            }
+        } catch (_: Exception) {
+            // 不是目录的 assets 项
+        }
+    }
+
+    /** 根据文件名后缀推断 ContentType */
+    private fun contentTypeFor(name: String): ContentType = when (name.substringAfterLast('.', "").lowercase()) {
+        "html", "htm" -> ContentType.Text.Html
+        "js" -> ContentType.Application.JavaScript
+        "css" -> ContentType.Text.CSS
+        "json" -> ContentType.Application.Json
+        "png" -> ContentType.Image.PNG
+        "jpg", "jpeg" -> ContentType.Image.JPEG
+        "svg" -> ContentType.Image.SVG
+        "woff2" -> ContentType.Application.OctetStream
+        else -> ContentType.Application.OctetStream
+    }
 }
+

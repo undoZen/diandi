@@ -34,6 +34,7 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <application
+        android:name=".MainApplication"
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:networkSecurityConfig="@xml/network_security_config"
@@ -56,6 +57,13 @@
             android:showWhenLocked="true"
             android:turnScreenOn="true"
             android:theme="@android:style/Theme.Material.NoActionBar" />
+
+        <!-- 通知列表原生屏（React Native）。需 AppCompat 主题；由 MainActivity 按钮拉起 -->
+        <activity
+            android:name=".NotificationsActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Diandi.RN" />
 
         <service
             android:name=".WebServerService"

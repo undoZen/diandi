@@ -1,0 +1,11 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@diandi/shared": ["../shared/src/index.ts"],
+      "@diandi/shared/*": ["../shared/src/*"]
+    }
+  },
+  "include": ["src", "index.js"]
+}

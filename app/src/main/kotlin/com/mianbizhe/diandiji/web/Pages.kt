@@ -6,8 +6,12 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 所有 HTML 页面集中在这里（内联 CSS/JS、无外网 CDN）。
- * 注意：页内 JS 一律不用模板字符串（反引号），避免与 Kotlin 的 $ 插值冲突。
+ * 通知历史 Web 页（临时保留）。
+ *
+ * 其余页面（首页 / 消费 / 统计）已迁至 React Web SPA，构建产物在
+ * `assets/web/`，由 Ktor `staticResources("/", "web")` 托管。
+ *
+ * 本文件随 Phase 4 的 RN 原生通知列表上线后整体删除。
  */
 object Pages {
 
@@ -47,116 +51,6 @@ object Pages {
     }
 
     /** 通知历史列表页：纯静态 HTML + fetch /api/notifications 渲染 */
-    fun notifications(): String = """
-        <!DOCTYPE html>
-        <html lang="zh-CN">
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <title>点滴集 · 通知历史</title>
-          <style>
-            :root { color-scheme: dark; }
-            body { font-family: system-ui, sans-serif; margin: 0; background: #14181d; color: #e8eaed; }
-            header { position: sticky; top: 0; z-index: 10; background: #1c2128; padding: .8rem 1rem;
-                     display: flex; align-items: baseline; gap: .8rem; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
-            header h1 { font-size: 1.1rem; margin: 0; }
-            header .count { opacity: .6; font-size: .85rem; }
-            header a { margin-left: auto; color: #8fd3ff; font-size: .85rem; text-decoration: none; }
-            ul { list-style: none; margin: 0; padding: .5rem; }
-            li { background: #1c2128; border-radius: 10px; padding: .7rem .9rem; margin-bottom: .5rem; }
-            li.removed { opacity: .55; }
-            .row1 { display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; }
-            .app { font-weight: 600; font-size: .8rem; color: #8fd3ff; }
-            .cat { font-size: .7rem; padding: .05rem .45rem; border-radius: 999px;
-                   background: #2d3644; color: #a9c7e8; }
-            .time { margin-left: auto; font-size: .75rem; opacity: .55; white-space: nowrap; }
-            .title { font-weight: 600; margin-top: .25rem; }
-            .text { margin-top: .15rem; font-size: .9rem; opacity: .85; white-space: pre-wrap;
-                    word-break: break-word; }
-            .msgs { margin-top: .3rem; font-size: .85rem; border-left: 2px solid #2d3644;
-                    padding-left: .6rem; opacity: .9; }
-            .msgs .sender { color: #a9c7e8; }
-            .pkg { margin-top: .35rem; font-size: .7rem; opacity: .45; font-family: monospace;
-                   user-select: all; } /* user-select:all 点一下全选，方便复制进白名单 */
-            .empty { text-align: center; opacity: .5; padding: 3rem 1rem; }
-            nav { display: flex; gap: .5rem; padding: .5rem .5rem 0; }
-            nav button { font: inherit; font-size: .8rem; padding: .25rem .8rem; border-radius: 999px;
-                         border: 1px solid #2d3644; background: transparent; color: #a9c7e8; }
-            nav button.active { background: #2d5a88; border-color: #2d5a88; color: #fff; }
-          </style>
-        </head>
-        <body>
-          <header>
-            <h1>&#128276; 通知历史</h1>
-            <span class="count" id="count"></span>
-            <a href="/ble">BLE</a>
-            <a href="/spending">消费</a>
-          </header>
-          <nav id="filters">
-            <button data-filter="">全部</button>
-            <button data-filter="finance">财务通知</button>
-          </nav>
-          <ul id="list"></ul>
-          <div class="empty" id="empty" hidden>还没有通知，等几条进来再刷新</div>
-          <script>
-            function esc(s) {
-              return String(s).replace(/[&<>"]/g, function (c) {
-                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-              });
-            }
-            function fmt(ts) {
-              var d = new Date(ts), now = new Date();
-              var hm = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
-              return d.toDateString() === now.toDateString()
-                ? hm
-                : (d.getMonth() + 1) + '-' + d.getDate() + ' ' + hm;
-            }
-            function load(filter) {
-              document.querySelectorAll('#filters button').forEach(function (b) {
-                b.className = b.getAttribute('data-filter') === filter ? 'active' : '';
-              });
-              try { localStorage.setItem('filter', filter); } catch (e) {}
-              fetch('/api/notifications?limit=200' + (filter ? '&filter=' + filter : ''))
-                .then(function (r) { return r.json(); })
-                .then(function (items) {
-                  document.getElementById('count').textContent = '最近 ' + items.length + ' 条';
-                  document.getElementById('empty').hidden = items.length > 0;
-                  var html = '';
-                  items.forEach(function (n) {
-                    var body = n.bigText || n.text || n.textLines || '';
-                    html += '<li' + (n.removedAt ? ' class="removed"' : '') + '>'
-                      + '<div class="row1">'
-                      + '<span class="app">' + esc(n.appName) + '</span>'
-                      + (n.category ? '<span class="cat">' + esc(n.category) + '</span>' : '')
-                      + (n.isOngoing ? '<span class="cat">常驻</span>' : '')
-                      + '<span class="time">' + fmt(n.postTime) + '</span>'
-                      + '</div>'
-                      + (n.title ? '<div class="title">' + esc(n.title) + '</div>' : '')
-                      + (body ? '<div class="text">' + esc(body) + '</div>' : '');
-                    if (n.messages && n.messages.length) {
-                      html += '<div class="msgs">';
-                      n.messages.forEach(function (m) {
-                        html += '<div><span class="sender">' + esc(m.sender || '?') + '</span>：'
-                          + esc(m.text || '') + '</div>';
-                      });
-                      html += '</div>';
-                    }
-                    html += '<div class="pkg">' + esc(n.packageName) + '</div>';
-                    html += '</li>';
-                  });
-                  document.getElementById('list').innerHTML = html;
-                });
-            }
-            document.querySelectorAll('#filters button').forEach(function (b) {
-              b.addEventListener('click', function () { load(b.getAttribute('data-filter')); });
-            });
-            var saved = 'finance'; // 默认财务组；用户切换过则记住上次选择
-            try { saved = localStorage.getItem('filter') !== null ? localStorage.getItem('filter') : 'finance'; } catch (e) {}
-            load(saved);
-          </script>
-        </body>
-        </html>
-    """.trimIndent()
 
     /**
      * 消费页：按日分组 + 类别 chip；点 chip 弹底部选择层改类别（POST 修正）。
