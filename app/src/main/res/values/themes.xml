@@ -1,0 +1,5 @@
+<resources>
+    <!-- RN ReactActivity 需 AppCompat 主题；仅 NotificationsActivity 使用。
+         其余 Activity 仍用 application 级别的 Theme.Material.NoActionBar。 -->
+    <style name="Theme.Diandi.RN" parent="Theme.AppCompat.Light.NoActionBar" />
+</resources>
