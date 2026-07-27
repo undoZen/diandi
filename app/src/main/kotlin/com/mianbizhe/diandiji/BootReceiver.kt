@@ -30,5 +30,7 @@ class BootReceiver : BroadcastReceiver() {
         // 无声音乐由「保活+」开关控制
         PullAliveJobService.schedule(context)
         KeepAliveOption.applyIfEnabled(context)
+        // 解锁/开机顺手自检采集器：有权限但掉绑（进程被杀后常见）则强制重绑
+        KeepAlive.ensureCollectorBound(context)
     }
 }

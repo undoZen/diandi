@@ -58,30 +58,7 @@ class SetupModule(private val reactContext: ReactApplicationContext) :
     /** 权限在但系统未绑定监听器时（debug 装机常见），强制系统重新绑定 */
     @ReactMethod
     fun rebindCollector() {
-        val cn = android.content.ComponentName(
-            reactContext,
-            com.mianbizhe.diandiji.collect.NotificationCollectorService::class.java,
-        )
-        try {
-            // 禁用→启用组件：通知监听器相当于被系统重新发现，从未绑定过的状态也有效
-            // （requestRebind 只对"绑定过又断开"有效，新装未绑定场景是空操作）
-            val pm = reactContext.packageManager
-            pm.setComponentEnabledSetting(
-                cn,
-                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                PackageManager.DONT_KILL_APP,
-            )
-            pm.setComponentEnabledSetting(
-                cn,
-                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                PackageManager.DONT_KILL_APP,
-            )
-        } catch (_: Exception) {
-        }
-        try {
-            android.service.notification.NotificationListenerService.requestRebind(cn)
-        } catch (_: Exception) {
-        }
+        NotificationCollectorService.forceRebind(reactContext)
     }
 
     @ReactMethod

@@ -76,6 +76,10 @@ class MainActivity : Activity() {
         if (!WebServerService.isRunning) {
             startForegroundService(Intent(this, WebServerService::class.java))
         }
+        // 有权限但采集器掉绑（进程被杀后系统不主动重绑）时自动重绑：
+        // 3s 首查（给系统自然绑定留时间），8s 复查一次
+        webView.postDelayed({ KeepAlive.ensureCollectorBound(this) }, 3000)
+        webView.postDelayed({ KeepAlive.ensureCollectorBound(this) }, 8000)
         // 给服务器一点启动时间再加载，避免必然的首次失败
         val target = intent.getStringExtra(EXTRA_URL) ?: homeUrl
         webView.postDelayed(

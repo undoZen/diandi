@@ -1,6 +1,9 @@
 package com.mianbizhe.diandiji.collect
 
 import android.app.Notification
+import android.content.ComponentName
+import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -46,6 +49,33 @@ class NotificationCollectorService : NotificationListenerService() {
         @Volatile
         var isConnected = false
             private set
+
+        /**
+         * 权限在但系统未绑定监听器时（进程被杀/国产 ROM 限制后常见），强制系统重新发现：
+         * 禁用→启用组件。requestRebind 只对「绑定过又断开」有效，新装未绑定场景是空操作，两个都调。
+         */
+        fun forceRebind(context: Context) {
+            val cn = ComponentName(context, NotificationCollectorService::class.java)
+            try {
+                val pm = context.packageManager
+                pm.setComponentEnabledSetting(
+                    cn,
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP,
+                )
+                pm.setComponentEnabledSetting(
+                    cn,
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                    PackageManager.DONT_KILL_APP,
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "force rebind failed", e)
+            }
+            try {
+                requestRebind(cn)
+            } catch (_: Exception) {
+            }
+        }
     }
 
     override fun onCreate() {

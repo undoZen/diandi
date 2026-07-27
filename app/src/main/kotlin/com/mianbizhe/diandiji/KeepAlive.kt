@@ -7,6 +7,8 @@ import android.content.Intent
 import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
+import android.util.Log
+import com.mianbizhe.diandiji.collect.NotificationCollectorService
 
 /**
  * 保活 = 引导用户给三个白名单，没有任何隐藏 API（SmsForwarder 亦如此）：
@@ -25,6 +27,18 @@ object KeepAlive {
         Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
             ?.split(':')
             ?.any { it.startsWith("${context.packageName}/") } == true
+
+    /**
+     * 有「通知使用权」但采集器未连接时（进程被杀后系统常常不主动重绑），强制重绑。
+     * 各拉活/事件时机（打开 App、解锁、周期任务、网络切换）都应顺手调用——
+     * 参考 SmsForwarder 用系统事件做状态恢复的思路。
+     */
+    fun ensureCollectorBound(context: Context) {
+        if (!isNotifAccessGranted(context)) return
+        if (NotificationCollectorService.isConnected) return
+        Log.i("diandi-keepalive", "granted but collector not bound, force rebind")
+        NotificationCollectorService.forceRebind(context)
+    }
 
     /** 弹系统「允许忽略电池优化」对话框 */
     @SuppressLint("BatteryLife")

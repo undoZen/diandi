@@ -37,6 +37,8 @@ class PullAliveJobService : JobService() {
         if (KeepAliveOption.isEnabled(this)) {
             SilentMusicPlayer.start(applicationContext)
         }
+        // 15 分钟周期自检采集器：有权限但掉绑则强制重绑
+        com.mianbizhe.diandiji.KeepAlive.ensureCollectorBound(this)
         jobFinished(params, false) // 无异步工作，同步完成
         return false
     }

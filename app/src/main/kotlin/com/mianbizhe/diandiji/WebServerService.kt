@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Intent
 import android.content.res.AssetManager
 import android.net.ConnectivityManager
+import android.os.SystemClock
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.os.Build
@@ -142,6 +143,7 @@ class WebServerService : Service() {
     private val startedAt = System.currentTimeMillis()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var lastCollectorCheckAt = 0L // 网络切换触发采集器自检的防抖时间戳
 
     /** React Web 构建产物目录（首次启动从 assets/web/ 复制到 cacheDir/web/） */
     private lateinit var webDir: File
@@ -741,6 +743,13 @@ class WebServerService : Service() {
         networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 refreshLanIp(cm)
+                // 网络切换顺手自检采集器（SmsForwarder 用网络事件做状态恢复的思路）；
+                // 30s 防抖，避免网络抖动/双 Wi-Fi 切换反复重绑
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastCollectorCheckAt > 30_000) {
+                    lastCollectorCheckAt = now
+                    KeepAlive.ensureCollectorBound(this@WebServerService)
+                }
             }
             override fun onLost(network: Network) {
                 refreshLanIp(cm)
