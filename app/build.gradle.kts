@@ -33,8 +33,8 @@ android {
         applicationId = "com.mianbizhe.diandiji"
         minSdk = 26
         targetSdk = 34
-        versionCode = 13
-        versionName = "0.3.1"
+        versionCode = 14
+        versionName = "0.4.0"
     }
 
     buildTypes {
