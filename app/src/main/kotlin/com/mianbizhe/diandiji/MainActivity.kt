@@ -93,9 +93,10 @@ class MainActivity : Activity() {
         webView.loadUrl(homeUrl)
     }
 
-    /** WebView 内后退优先，退无可退才退出 Activity */
+    /** 返回键 = 退出到桌面（App 逻辑）。不回退 WebView 历史——底部 tab 已覆盖
+     *  全部导航且 tab 切换用 replace 不留历史，逐页回退在手机应用里是反直觉的 */
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
+        moveTaskToBack(true)
     }
 }

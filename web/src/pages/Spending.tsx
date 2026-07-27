@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { isInApp } from '../lib/env';
 import { dayKey, dayLabel, hm, yuan } from '@diandi/shared';
 import type { SpendingItem } from '@diandi/shared';
 
@@ -98,9 +99,15 @@ export default function Spending() {
         <span className="text-ink-muted">
           {rows.length} 笔{newCount > 0 ? ` · ${newCount} 新` : ''}
         </span>
+        {/* 通知列表是 RN 原生屏，仅 App 内可见（浏览器无 /native/ 拦截） */}
+        {isInApp && (
+          <a href="/native/notifications" className="ml-auto text-ink-muted">
+            通知列表
+          </a>
+        )}
         <button
           onClick={() => setManualOpen(true)}
-          className="ml-auto font-semibold text-ink-warn"
+          className={`font-semibold text-ink-warn ${isInApp ? '' : 'ml-auto'}`}
         >
           ＋录入
         </button>
@@ -115,7 +122,7 @@ export default function Spending() {
           const sum = g.items.reduce((s, r) => s + r.amountCents, 0);
           return (
             <div key={g.key}>
-              <div className="sticky top-14 z-[5] flex justify-between bg-ink-base px-4 py-2 text-xs text-ink-muted">
+              <div className="sticky top-0 z-[5] flex justify-between bg-ink-base px-4 py-2 text-xs text-ink-muted">
                 <span>
                   {dayLabel(g.items[0].txTime)} · {g.items.length}笔
                 </span>
