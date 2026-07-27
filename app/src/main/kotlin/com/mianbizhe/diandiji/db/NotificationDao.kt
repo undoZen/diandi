@@ -14,6 +14,17 @@ interface NotificationDao {
     @Query("SELECT contentHash FROM notification_history WHERE sbnKey = :sbnKey ORDER BY id DESC LIMIT 1")
     suspend fun lastContentHash(sbnKey: String): Int?
 
+    /**
+     * ANCS 重推去重：iOS 重连会把通知中心的老通知重推且分配新 UID（sbnKey 失效），
+     * 但重推保留原始弹出时间——同包、同内容、postTime 在 ±5 分钟内即为同一通知。
+     * 窗口取 5 分钟：真实重复消费（同店同价连刷两笔）的弹出时间间隔通常更大。
+     */
+    @Query(
+        "SELECT COUNT(*) FROM notification_history " +
+            "WHERE packageName = :pkg AND contentHash = :hash AND postTime BETWEEN :lo AND :hi"
+    )
+    suspend fun countContentAround(pkg: String, hash: Int, lo: Long, hi: Long): Int
+
     /** 通知被移除时，回填该 key 尚未标记移除的行 */
     @Query(
         "UPDATE notification_history SET removedAt = :removedAt, removeReason = :reason " +

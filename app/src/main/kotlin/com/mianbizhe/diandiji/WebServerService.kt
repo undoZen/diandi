@@ -673,7 +673,15 @@ class WebServerService : Service() {
                     scope.launch {
                         try {
                             val dao = AppDatabase.get(this@WebServerService).notificationDao()
-                            if (dao.lastContentHash(entity.sbnKey) != entity.contentHash) {
+                            // 去重两层:同 sbnKey 连续重复 + ANCS 重推(iOS 重连重发老通知,
+                            // 新 UID 但保留原始弹出时间——同内容 ±5 分钟即判重)
+                            val win = 5 * 60 * 1000L
+                            val isDup = dao.lastContentHash(entity.sbnKey) == entity.contentHash ||
+                                dao.countContentAround(
+                                    entity.packageName, entity.contentHash,
+                                    entity.postTime - win, entity.postTime + win,
+                                ) > 0
+                            if (!isDup) {
                                 val insertedId = dao.insert(entity)
                                 val withId = entity.copy(id = insertedId)
                                 // 更新前台通知计数
@@ -693,6 +701,8 @@ class WebServerService : Service() {
                                 } catch (e: Exception) {
                                     Log.e(TAG, "ANCS spend pipeline failed", e)
                                 }
+                            } else {
+                                Log.i(TAG, "ANCS skip dup: ${entity.packageName} / ${entity.title?.take(40)}")
                             }
                         } catch (e: Exception) {
                             Log.e(TAG, "ANCS insert failed", e)

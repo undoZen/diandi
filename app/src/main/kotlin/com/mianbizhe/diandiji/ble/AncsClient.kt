@@ -573,7 +573,7 @@ class AncsClient(
         val subtitle= attrs[ATTR_SUBTITLE]
         val message = attrs[ATTR_MESSAGE]
         val dateStr = attrs[ATTR_DATE]
-        log("DS final uid=$uid app=$appId attrs=${attrs.keys.sorted()} title=${title.orEmpty().take(40)} msg=${message.orEmpty().take(60)}")
+        log("DS final uid=$uid app=$appId attrs=${attrs.keys.sorted()} date=${dateStr.orEmpty()} title=${title.orEmpty().take(40)} msg=${message.orEmpty().take(60)}")
 
         val postTime = dateStr?.let(::parseAncsDate) ?: System.currentTimeMillis()
         // 过滤订阅瞬间刷盘的历史通知
@@ -603,13 +603,30 @@ class AncsClient(
         onNotification(entity)
     }
 
-    private fun parseAncsDate(iso: String): Long = try {
-        val tz = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US).apply {
-            timeZone = java.util.TimeZone.getTimeZone("UTC")
+    /**
+     * ANCS Date 属性格式为 yyyyMMdd'T'HHmmss。实测（2026-07,真机对账）iOS 发的
+     * 是设备本地时间而非 UTC——按 UTC 解析会得到未来 8 小时的 postTime,
+     * 导致历史过滤和重推去重全部失效。
+     */
+    private fun parseAncsDate(iso: String): Long {
+        val trimmed = iso.trim()
+        return try {
+            // 规范格式：20260726T101740
+            val f = java.text.SimpleDateFormat("yyyyMMdd'T'HHmmss", java.util.Locale.US)
+            f.parse(trimmed.take(16))?.time ?: System.currentTimeMillis()
+        } catch (_: Exception) {
+            try {
+                // 兼容带分隔符/时区后缀的变体
+                val f = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                val clean = trimmed.replace(Regex("[+-]\\d{2}:?\\d{2}$"), "")
+                    .replace("Z", "").replace("T", " ").take(19)
+                f.parse(clean)?.time ?: System.currentTimeMillis()
+            } catch (_: Exception) {
+                Log.w(TAG, "unparseable ANCS date: $trimmed")
+                System.currentTimeMillis()
+            }
         }
-        val clean = iso.replace(Regex("[+-]\\d{4}$"), "").replace("Z", "").replace("T", " ").take(19)
-        tz.parse(clean)?.time ?: System.currentTimeMillis()
-    } catch (_: Exception) { System.currentTimeMillis() }
+    }
 
     // ====================================================================
     // Phase 2 GATT 回调
