@@ -121,6 +121,8 @@ export function chooseBudget(factor: number): void {
 export function finishOnboarding(): void {
   if (getState().profile.onboardStep === 'done') return;
   patchProfile({ onboardStep: 'done', reviewedWeeks: [weekKey(Date.now())] });
+  // 安卓：引导完成后紧接着检查通知权限（延迟一下，排在开场白之后）
+  window.setTimeout(() => { import('./android').then((m) => m.checkSetup()); }, 4000);
   const s = getState();
   askAI(onboardingSummaryPrompt(s), () => (s.profile.persona === 'warm'
     ? `准备好啦！目标是「${s.profile.goal}」，每周预算 ${yuan(Object.values(s.profile.budgets).reduce((a, b) => a + b, 0))} 元。以后有消费直接发「午饭 35」这样一句就能记，安卓上会自动从通知里抓。每周我们一起复盘 🌷`

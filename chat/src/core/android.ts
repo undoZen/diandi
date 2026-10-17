@@ -3,7 +3,7 @@
 import { CATEGORIES } from './classifier';
 import { recordSpend } from './agent';
 import { weekKey } from './budget';
-import { getState, setState } from './store';
+import { getState, pushMessage, setState, uid } from './store';
 
 interface RemoteSpend {
   id: number;
@@ -54,6 +54,39 @@ export function startAndroidSync(): void {
   if (!isAndroidShell()) return;
   const tick = () => syncOnce().catch(() => { /* 服务重启中，下个周期再试 */ });
   tick();
+  checkSetup();
   window.setInterval(tick, 5000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { tick(); checkSetup(); } });
+}
+
+interface SetupStatus {
+  notifAccess: boolean;
+  collectorConnected: boolean;
+  batteryIgnored: boolean;
+  postNotifs: boolean;
+}
+
+let setupPrompted = false;
+
+/** 没开「通知使用权」就抓不到消费：在对话里提醒一次（每次启动最多一次），带去设置页的按钮 */
+export async function checkSetup(): Promise<void> {
+  if (!isAndroidShell() || setupPrompted || getState().profile.onboardStep !== 'done') return;
+  const res = await fetch('/api/setup/status').catch(() => null);
+  if (!res?.ok) return;
+  const st = (await res.json()) as SetupStatus;
+  if (st.notifAccess && st.batteryIgnored) return;
+  setupPrompted = true;
+  const lines = [
+    !st.notifAccess && '· 「通知使用权」还没打开，银行和支付通知进不来，没法自动记账',
+    !st.batteryIgnored && '· 还没允许「忽略电池优化」，系统可能会在后台把我关掉',
+  ].filter(Boolean).join('\n');
+  pushMessage({
+    id: uid(), kind: 'text', role: 'assistant', createdAt: Date.now(), persona: getState().profile.persona, local: true,
+    text: `要自动记账，还差一步：\n${lines}\n\n点下面的按钮，我带你去打开。`,
+    chips: [{ label: '🔐 去开启权限', action: 'native-setup' }, { label: '先不用', action: 'noop' }],
+  });
+}
+
+export function openNativeSetup(): void {
+  location.href = '/native/setup';
 }

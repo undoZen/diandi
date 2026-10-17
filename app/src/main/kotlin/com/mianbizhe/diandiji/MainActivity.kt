@@ -6,7 +6,10 @@ import android.content.Intent
 import android.os.Bundle
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
 import android.webkit.WebView
+import android.net.Uri
 import android.webkit.WebViewClient
 import com.mianbizhe.diandiji.setup.SetupActivity
 
@@ -22,6 +25,16 @@ import com.mianbizhe.diandiji.setup.SetupActivity
 class MainActivity : Activity() {
 
     private lateinit var webView: WebView
+    private var fileCallback: ValueCallback<Array<Uri>>? = null
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQ_PICK_IMAGE) return
+        val uri = if (resultCode == RESULT_OK) data?.data else null
+        fileCallback?.onReceiveValue(uri?.let { arrayOf(it) })
+        fileCallback = null
+    }
 
     private val homeUrl get() = "http://127.0.0.1:${WebServerService.PORT}/"
     private var loadFailed = false
@@ -29,6 +42,7 @@ class MainActivity : Activity() {
     companion object {
         /** 从其他屏（如设置屏的「打开 BLE 管理页」）指定加载路径 */
         const val EXTRA_URL = "com.mianbizhe.diandiji.EXTRA_URL"
+        private const val REQ_PICK_IMAGE = 1001
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -70,6 +84,27 @@ class MainActivity : Activity() {
                     return true
                 }
                 return false
+            }
+        }
+
+        // 对话版的「截图记账」用 <input type=file>，WebView 默认不弹选择器，需要自己接
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onShowFileChooser(
+                view: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams,
+            ): Boolean {
+                fileCallback?.onReceiveValue(null)
+                fileCallback = callback
+                return try {
+                    @Suppress("DEPRECATION")
+                    startActivityForResult(
+                        Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE),
+                        REQ_PICK_IMAGE,
+                    )
+                    true
+                } catch (_: Exception) {
+                    fileCallback = null
+                    false
+                }
             }
         }
 

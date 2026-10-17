@@ -352,6 +352,21 @@ class WebServerService : Service() {
                         }
                         call.respondText(arr.toString(), ContentType.Application.Json)
                     }
+                    // 对话版：权限/采集器状态，决定是否在对话里弹「去开权限」卡片
+                    get("/api/setup/status") {
+                        val ctx = this@WebServerService
+                        val postNotifs = android.os.Build.VERSION.SDK_INT < 33 ||
+                            ctx.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+                            android.content.pm.PackageManager.PERMISSION_GRANTED
+                        val out = JSONObject().apply {
+                            put("notifAccess", KeepAlive.isNotifAccessGranted(ctx))
+                            put("collectorConnected", com.mianbizhe.diandiji.collect.NotificationCollectorService.isConnected)
+                            put("batteryIgnored", KeepAlive.isIgnoringBatteryOptimizations(ctx))
+                            put("postNotifs", postNotifs)
+                            put("version", BuildConfig.VERSION_NAME)
+                        }
+                        call.respondText(out.toString(), ContentType.Application.Json)
+                    }
                     // 对话版 AI 请求的本机转发：有些供应商（智谱）不放行 WebView 跨域，
                     // 由手机自己的 HTTP 客户端发出去，仍然不经过任何第三方服务器。只放行白名单域名。
                     post("/api/llm-proxy") {

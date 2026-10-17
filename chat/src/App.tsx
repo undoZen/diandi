@@ -3,7 +3,7 @@ import {
   addScreenshotFile, CATEGORIES, chooseBudget, chooseGoal, choosePersona, dismissReview, finishOnboarding, handleUserText,
   injectDemoNotification, runMonthReview, runWeekReview,
 } from './core/agent';
-import { isAndroidShell } from './core/android';
+import { isAndroidShell, openNativeSetup } from './core/android';
 import { CATEGORY_EMOJI, monthKey, weekKey, yuan } from './core/budget';
 import { patchProfile, resetAll, setState, useStore, type Chip, type Message } from './core/store';
 import { PERSONAS } from './prompts/personas';
@@ -40,6 +40,8 @@ function runChip(c: Chip, openSettings: () => void) {
     case 'send': return handleUserText(c.arg!);
     case 'demo': return injectDemoNotification();
     case 'screenshot': return pickScreenshot();
+    case 'native-setup': return openNativeSetup();
+    case 'noop': return;
     case 'review-week': return runWeekReview(c.arg!);
     case 'review-month': return runMonthReview(c.arg!);
     case 'dismiss-review': return dismissReview(c.arg!);
@@ -220,6 +222,7 @@ function Menu({ onClose, openSettings, openBudget }: { onClose: () => void; open
         {item('🗓️', '本月复盘', () => runMonthReview(monthKey(Date.now())))}
         {item('🎯', '调整每周预算', openBudget)}
         {item(PERSONAS[other].avatar, `换成「${PERSONAS[other].name}」· ${PERSONAS[other].tagline}`, () => choosePersona(other))}
+        {isAndroidShell() && item('🔐', '权限与保活设置（自动记账必看）', openNativeSetup)}
         {item('⚙️', 'AI 设置', openSettings)}
         {item('💬', '社区：和大家聊聊记账与保障', () => window.open(COMMUNITY_URL, '_blank'))}
         {item('🧹', '清空本机数据重新开始', () => { if (confirm('确定清空本机所有记账与对话？')) { resetAll(); location.reload(); } })}
