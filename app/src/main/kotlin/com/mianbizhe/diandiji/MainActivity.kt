@@ -38,6 +38,7 @@ class MainActivity : Activity() {
 
         webView = findViewById(R.id.webview)
         webView.settings.javaScriptEnabled = true // SPA 靠 JS 渲染
+        webView.settings.domStorageEnabled = true // 对话版账本与对话存在 localStorage
         // UA 加 App 标记：SPA 据此显示仅 App 内有效的入口（/native/ 链接卡片），浏览器访问时隐藏
         webView.settings.userAgentString = "${webView.settings.userAgentString} DiandiApp/${BuildConfig.VERSION_NAME}"
         webView.webViewClient = object : WebViewClient() {

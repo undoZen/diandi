@@ -16,6 +16,7 @@ keystore.properties
 # JS / React Native / Vite 生成物与依赖
 node_modules/
 web/dist/
+chat/dist/
 app/src/main/assets/web/
 app/src/main/assets/index.android.bundle
 autolinking.json

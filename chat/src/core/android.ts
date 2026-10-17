@@ -1,0 +1,59 @@
+// Android 外壳对接：diandi 的 Ktor 与页面同源（127.0.0.1:PORT），常驻服务抓通知→解析→贝叶斯分类后落 Room，
+// 这里轮询 /api/spending 把新消费拉进对话。浏览器/iPhone 里 /api/ping 不通，整个模块静默不工作。
+import { CATEGORIES } from './classifier';
+import { recordSpend } from './agent';
+import { weekKey } from './budget';
+import { getState, setState } from './store';
+
+interface RemoteSpend {
+  id: number;
+  txTime: number;
+  amountCents: number;
+  merchant: string | null;
+  channel: string | null;
+  category: string;
+  hidden: boolean;
+}
+
+export const isAndroidShell = () => /DiandiApp\//.test(navigator.userAgent);
+
+async function syncOnce(): Promise<void> {
+  const s = getState();
+  if (s.profile.onboardStep !== 'done') return;
+  const res = await fetch('/api/spending?limit=100');
+  if (!res.ok) return;
+  const rows = (await res.json()) as RemoteSpend[];
+  const known = new Set(s.spends.map((x) => x.remoteId).filter((x) => x != null));
+  const firstSync = s.androidCursor === 0;
+  const fresh = rows
+    .filter((r) => !r.hidden && r.id > s.androidCursor && !known.has(r.id))
+    .sort((a, b) => a.id - b.id);
+  // 0 = 从未同步；首次同步后游标至少为 0.5（id 都是正整数），之后的新消费才逐条点评
+  if (fresh.length === 0) {
+    if (firstSync) setState((st) => ({ ...st, androidCursor: 0.5 }));
+    return;
+  }
+  const thisWeek = weekKey(Date.now());
+  for (const r of fresh) {
+    // 首次连上：只把本周的历史静默导入，避免一次性刷几十条点评
+    if (firstSync && weekKey(r.txTime) !== thisWeek) continue;
+    recordSpend(
+      { amountCents: r.amountCents, merchant: r.merchant, channel: r.channel, rawText: '' },
+      'android',
+      {
+        txTime: r.txTime, remoteId: r.id,
+        category: CATEGORIES.includes(r.category) ? r.category : '其他',
+        comment: !firstSync,
+      },
+    );
+  }
+  setState((st) => ({ ...st, androidCursor: Math.max(st.androidCursor, ...fresh.map((r) => r.id)) }));
+}
+
+export function startAndroidSync(): void {
+  if (!isAndroidShell()) return;
+  const tick = () => syncOnce().catch(() => { /* 服务重启中，下个周期再试 */ });
+  tick();
+  window.setInterval(tick, 5000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+}

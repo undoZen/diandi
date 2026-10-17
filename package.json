@@ -1,13 +1,21 @@
 {
   "name": "diandi",
   "private": true,
-  "workspaces": ["web", "mobile", "shared"],
+  "workspaces": [
+    "web",
+    "mobile",
+    "shared",
+    "chat"
+  ],
   "scripts": {
     "web:dev": "npm run dev --workspace web",
     "web:build": "npm run build --workspace web",
     "mobile:start": "npm run start --workspace mobile",
     "mobile:bundle:dev": "npm run bundle:dev --workspace mobile",
-    "mobile:bundle:release": "npm run bundle:release --workspace mobile"
+    "mobile:bundle:release": "npm run bundle:release --workspace mobile",
+    "chat:dev": "npm run dev --workspace chat",
+    "chat:build": "npm run build --workspace chat",
+    "chat:build:android": "npm run build:android --workspace chat"
   },
   "dependencies": {
     "react-native": "0.75.5"

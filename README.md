@@ -123,3 +123,16 @@ diandi/
 ├── autolinking.json           # RN autolinking 缓存（.gitignore）
 └── react-native.config.js     # RN brownfield 配置
 ```
+
+## 对话版（黑客松，`chat/`）
+
+需求见 `PRD.md`。一套 Web 对话应用同时用于 Web 演示、iPhone PWA 和 Android 外壳：
+
+```bash
+npm install
+npm run chat:dev              # 浏览器开发，http://localhost:5174
+npm run chat:build            # 产物在 chat/dist/，可直接挂到任意静态站点子路径
+npm run chat:build:android    # 产物写进 app/src/main/assets/web，再 ./gradlew assembleDebug
+```
+
+AI 点评用 OpenAI 兼容接口（默认 DeepSeek），在 App 菜单「AI 设置」里填自己的 Key，只存本机、浏览器直连。

@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: #f6f3ee;
+  color: #2b2722;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+.caret::after { content: '▍'; animation: blink 1s steps(1) infinite; color: #e8796a; margin-left: 1px; }
+@keyframes blink { 50% { opacity: 0; } }
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
