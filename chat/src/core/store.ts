@@ -1,6 +1,7 @@
 // 全部状态存在本机 localStorage，一个 key 一份 JSON；不存在任何服务器。
 import { useSyncExternalStore } from 'react';
 import type { Category } from './classifier';
+import type { ProviderId } from './providers';
 
 export type PersonaId = 'warm' | 'roast';
 export type SpendSource = 'manual' | 'demo' | 'android' | 'shortcut' | 'screenshot';
@@ -60,9 +61,11 @@ export interface Profile {
 }
 
 export interface Settings {
-  apiKey: string;
-  baseUrl: string;
-  model: string;
+  provider: ProviderId;
+  /** 每家各存一份 key / 模型，切换供应商不丢 */
+  keys: Partial<Record<ProviderId, string>>;
+  models: Partial<Record<ProviderId, string>>;
+  customBaseUrl: string;
 }
 
 export interface State {
@@ -80,10 +83,21 @@ export interface State {
 const KEY = 'diandi-chat-v1';
 
 export const DEFAULT_SETTINGS: Settings = {
-  apiKey: '',
-  baseUrl: 'https://api.deepseek.com',
-  model: 'deepseek-chat',
+  provider: 'deepseek',
+  keys: {},
+  models: {},
+  customBaseUrl: '',
 };
+
+/** 旧版只有一组 apiKey/baseUrl/model：DeepSeek 地址的归 DeepSeek，其他的归自定义 */
+function migrateSettings(raw: Record<string, unknown> | undefined): Settings {
+  if (!raw) return { ...DEFAULT_SETTINGS };
+  if ('provider' in raw) return { ...DEFAULT_SETTINGS, ...(raw as unknown as Settings) };
+  const apiKey = String(raw.apiKey ?? '');
+  const baseUrl = String(raw.baseUrl ?? '');
+  if (!baseUrl || baseUrl.includes('deepseek.com')) return { ...DEFAULT_SETTINGS, keys: { deepseek: apiKey } };
+  return { ...DEFAULT_SETTINGS, provider: 'custom', keys: { custom: apiKey }, models: { custom: String(raw.model ?? '') }, customBaseUrl: baseUrl };
+}
 
 function initial(): State {
   return {
@@ -107,7 +121,7 @@ function load(): State {
       const s = JSON.parse(raw) as State;
       // 刷新时还在流式输出的消息已经断了
       s.messages = s.messages.map((m) => (m.kind === 'text' && m.streaming ? { ...m, streaming: false } : m));
-      return { ...initial(), ...s, settings: { ...DEFAULT_SETTINGS, ...s.settings } };
+      return { ...initial(), ...s, settings: migrateSettings(s.settings as unknown as Record<string, unknown>) };
     }
   } catch { /* 隐私模式等读不到就从头开始 */ }
   return initial();

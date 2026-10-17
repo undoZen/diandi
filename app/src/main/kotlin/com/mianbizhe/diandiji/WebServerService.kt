@@ -43,6 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -53,6 +54,9 @@ import java.util.concurrent.ConcurrentHashMap
  * 前台 Service，内嵌 Ktor(CIO) HTTP Server。
  * 第一阶段目标：真机上跑通 hello world，验证 APK 体积 / 启动 / 后台存活。
  */
+/** /api/llm-proxy 只转发到这些 AI 供应商 */
+private val LLM_PROXY_HOSTS = setOf("open.bigmodel.cn", "api.deepseek.com", "api.moonshot.cn")
+
 class WebServerService : Service() {
 
     companion object {
@@ -347,6 +351,36 @@ class WebServerService : Service() {
                             arr.put(spendingJson(s))
                         }
                         call.respondText(arr.toString(), ContentType.Application.Json)
+                    }
+                    // 对话版 AI 请求的本机转发：有些供应商（智谱）不放行 WebView 跨域，
+                    // 由手机自己的 HTTP 客户端发出去，仍然不经过任何第三方服务器。只放行白名单域名。
+                    post("/api/llm-proxy") {
+                        val req = runCatching { JSONObject(call.receiveText()) }.getOrNull()
+                        val url = req?.optString("url").orEmpty()
+                        val host = runCatching { java.net.URL(url).host }.getOrNull()
+                        if (req == null || !url.startsWith("https://") || host !in LLM_PROXY_HOSTS) {
+                            call.respondText("""{"error":{"message":"host not allowed"}}""",
+                                ContentType.Application.Json, HttpStatusCode.BadRequest)
+                            return@post
+                        }
+                        val (code, text) = withContext(Dispatchers.IO) {
+                            val conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                            try {
+                                conn.requestMethod = "POST"
+                                conn.connectTimeout = 15_000
+                                conn.readTimeout = 120_000
+                                conn.doOutput = true
+                                conn.setRequestProperty("Content-Type", "application/json")
+                                conn.setRequestProperty("Authorization", "Bearer ${req.optString("apiKey")}")
+                                conn.outputStream.use { it.write(req.optString("body").toByteArray()) }
+                                val c = conn.responseCode
+                                val stream = if (c in 200..299) conn.inputStream else conn.errorStream
+                                c to (stream?.bufferedReader()?.use { it.readText() } ?: "")
+                            } finally {
+                                conn.disconnect()
+                            }
+                        }
+                        call.respondText(text, ContentType.Application.Json, HttpStatusCode.fromValue(code))
                     }
                     get("/api/spending/categories") {
                         Classifier.ensureLoaded(this@WebServerService)

@@ -9,6 +9,8 @@ import { patchProfile, resetAll, setState, useStore, type Chip, type Message } f
 import { PERSONAS } from './prompts/personas';
 import { GuessCard, ReviewCard, ScreenshotCard, SpendCard, WeekSummary } from './components/Cards';
 import { isNativeIOS } from './core/ocr';
+import { activeConfig, isConfigured, PROVIDERS, providerOf } from './core/providers';
+import { testConnection } from './core/llm';
 
 export const COMMUNITY_URL = 'https://github.com/undoZen/diandi/issues';
 
@@ -101,26 +103,75 @@ function SettingsSheet({ onClose }: { onClose: () => void }) {
   const settings = useStore((s) => s.settings);
   const step = useStore((s) => s.profile.onboardStep);
   const [draft, setDraft] = useState(settings);
+  const [test, setTest] = useState<{ state: 'idle' | 'running' | 'ok' | 'fail'; text?: string }>({ state: 'idle' });
+  const prov = providerOf(draft.provider);
+  const cfg = activeConfig(draft);
+  const webBlocked = !prov.browserDirect && !isNativeIOS() && !isAndroidShell();
+
   const save = () => {
-    setState((s) => ({ ...s, settings: { ...draft, apiKey: draft.apiKey.trim() } }));
+    setState((s) => ({ ...s, settings: draft }));
     onClose();
     if (step === 'ai') finishOnboarding();
   };
-  const field = (label: string, key: keyof typeof draft, ph: string, type = 'text') => (
-    <label className="mb-3 block">
-      <div className="mb-1 text-sm text-muted">{label}</div>
-      <input type={type} value={draft[key]} placeholder={ph} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
-        className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-ink/40" />
-    </label>
-  );
+  const runTest = async () => {
+    setTest({ state: 'running' });
+    try {
+      setTest({ state: 'ok', text: await testConnection(cfg) });
+    } catch (e) {
+      setTest({ state: 'fail', text: (e as Error).message });
+    }
+  };
+  const input = 'w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-ink/40';
+
   return (
     <Sheet title="AI 设置" onClose={onClose}>
-      {field('API Key（只存本机）', 'apiKey', 'sk-…', 'password')}
-      {field('接口地址（OpenAI 兼容）', 'baseUrl', 'https://api.deepseek.com')}
-      {field('模型', 'model', 'deepseek-chat')}
+      <div className="mb-4 grid grid-cols-4 gap-1.5 rounded-2xl bg-line/60 p-1">
+        {PROVIDERS.map((p) => (
+          <button key={p.id} onClick={() => { setDraft({ ...draft, provider: p.id }); setTest({ state: 'idle' }); }}
+            className={`rounded-xl py-2 text-sm ${draft.provider === p.id ? 'bg-white font-medium shadow-sm' : 'text-muted'}`}>
+            {p.name}
+          </button>
+        ))}
+      </div>
+
+      <div className="mb-3 rounded-xl bg-white px-3 py-2.5 text-xs leading-relaxed text-muted">
+        {prov.keyUrl
+          ? <>还没有 Key？{prov.keyHint}：<a href={prov.keyUrl} target="_blank" rel="noreferrer" className="text-leaf underline">{prov.keyUrl.replace('https://', '')}</a></>
+          : prov.keyHint}
+        {webBlocked && <div className="mt-1.5 text-roast">{prov.name} 的接口不允许网页直接调用，网页版里用不了；在 iPhone / Android App 里可以正常使用。</div>}
+      </div>
+
+      {draft.provider === 'custom' && (
+        <label className="mb-3 block">
+          <div className="mb-1 text-sm text-muted">接口地址</div>
+          <input value={draft.customBaseUrl} placeholder="https://example.com/v1" className={input}
+            onChange={(e) => setDraft({ ...draft, customBaseUrl: e.target.value })} />
+        </label>
+      )}
+      <label className="mb-3 block">
+        <div className="mb-1 text-sm text-muted">API Key（只存本机）</div>
+        <input type="password" value={draft.keys[draft.provider] ?? ''} placeholder="sk-…" className={input}
+          onChange={(e) => setDraft({ ...draft, keys: { ...draft.keys, [draft.provider]: e.target.value } })} />
+      </label>
+      <label className="mb-3 block">
+        <div className="mb-1 text-sm text-muted">模型</div>
+        <input value={draft.models[draft.provider] ?? ''} placeholder={prov.defaultModel || '模型名'} list={`models-${prov.id}`} className={input}
+          onChange={(e) => setDraft({ ...draft, models: { ...draft.models, [draft.provider]: e.target.value } })} />
+        <datalist id={`models-${prov.id}`}>{prov.models.map((m) => <option key={m} value={m} />)}</datalist>
+      </label>
+
+      <div className="mb-4 flex items-center gap-3">
+        <button onClick={runTest} disabled={!isConfigured(draft) || test.state === 'running'}
+          className="shrink-0 rounded-full border border-ink/20 bg-white px-4 py-1.5 text-sm disabled:opacity-40">
+          {test.state === 'running' ? '测试中…' : '测试连接'}
+        </button>
+        {test.state === 'ok' && <span className="truncate text-xs text-leaf">✅ {test.text}</span>}
+        {test.state === 'fail' && <span className="text-xs text-roast">❌ {test.text}</span>}
+      </div>
+
       <p className="mb-4 text-xs leading-relaxed text-muted">
-        浏览器直接请求上面的接口，不经过任何中转服务器。AI 只会收到消费类别、金额和预算进度，不会收到商户名和通知原文；
-        每条回复下的「🔒 本次发给 AI 的内容」可以核对。
+        请求从你的设备直接发给 {prov.name === '自定义' ? '你填的接口' : prov.name}，不经过任何中转服务器。AI 只会收到消费类别、金额和预算进度，
+        不会收到商户名、截图和通知原文；每条回复下的「🔒 本次发给 AI 的内容」可以核对。
       </p>
       <button onClick={save} className="w-full rounded-full bg-ink py-2.5 text-white">保存</button>
     </Sheet>

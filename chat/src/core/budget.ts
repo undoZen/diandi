@@ -62,7 +62,9 @@ export function buildWeekReview(s: State, key: string): ReviewRow[] {
   const actual = sumByCategory(liveSpends(s), [from, to]);
   const n = weeksOfData(s, to);
   // 周中复盘：按已过天数把实际花费外推到整周，免得周三复盘时把没花到的类别预算砍半
-  const elapsedDays = Math.min(7, Math.max(1, Math.ceil((Date.now() - from) / 86_400_000)));
+  // 本周中途才开始用的，从开始用的那天算
+  const since = Math.max(from, weekStart(s.profile.createdAt).getTime() === from ? new Date(s.profile.createdAt).setHours(0, 0, 0, 0) : from);
+  const elapsedDays = Math.min(7, Math.max(1, Math.ceil((Date.now() - since) / 86_400_000)));
   const scale = 7 / elapsedDays;
   const w = Math.min(0.7, 0.4 + 0.1 * n);
   const tighten = /攒|省|控制|存/.test(s.profile.goal);

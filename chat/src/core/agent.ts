@@ -5,6 +5,7 @@ import {
 } from './budget';
 import { localReview, localSpendComment } from './fallback';
 import { streamChat } from './llm';
+import { activeConfig, isConfigured } from './providers';
 import { parseBankNotification, parseChatEntry, type ParsedSpend } from './parser';
 import { parseReceipt } from './receipt';
 import { isNativeIOS, latestScreenshot, recognizeFile, recognizeNative, thumbnailOf } from './ocr';
@@ -39,7 +40,7 @@ const sentPreview = (turns: ChatTurn[]) =>
 async function askAI(turns: ChatTurn[], fallback: () => string, chips?: Chip[]): Promise<void> {
   const s = getState();
   const id = uid();
-  const hasKey = !!s.settings.apiKey.trim();
+  const hasKey = isConfigured(s.settings);
   pushMessage({
     id, kind: 'text', role: 'assistant', text: '', createdAt: Date.now(), persona: s.profile.persona,
     streaming: hasKey, sent: hasKey ? sentPreview(turns) : undefined, chips,
@@ -49,7 +50,7 @@ async function askAI(turns: ChatTurn[], fallback: () => string, chips?: Chip[]):
     return;
   }
   try {
-    const text = await streamChat(s.settings, turns, (full) => patchMessage(id, { text: full }));
+    const text = await streamChat(activeConfig(s.settings), turns, (full) => patchMessage(id, { text: full }));
     patchMessage(id, { text: text || fallback(), streaming: false });
   } catch (e) {
     patchMessage(id, {
@@ -111,7 +112,7 @@ export function chooseBudget(factor: number): void {
   for (const [c, v] of Object.entries(guesses)) budgets[c] = Math.round((v * factor) / 1000) * 1000;
   patchProfile({ budgets, onboardStep: 'ai' });
   pushMessage({ id: uid(), kind: 'text', role: 'user', text: factor < 1 ? '挑战：少花 10%' : '就按猜的来', createdAt: Date.now(), local: true });
-  say('最后一步：接入 AI 点评。填一个 DeepSeek（或其他 OpenAI 兼容）的 API Key，它只保存在本机，浏览器直接连 AI，不经过任何中转服务器。\n\n也可以先跳过，用本地点评体验一下。', [
+  say('最后一步：接入 AI 点评。可以选 DeepSeek、智谱 GLM、Kimi，或者任何 OpenAI 兼容接口，填上自己的 API Key。Key 只保存在本机，请求从你的设备直接发给 AI，不经过任何中转服务器。\n\n也可以先跳过，用本地点评体验一下。', [
     { label: '去填 API Key', action: 'settings' },
     { label: '先跳过', action: 'finish-onboarding' },
   ]);
