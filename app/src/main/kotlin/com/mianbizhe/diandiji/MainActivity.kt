@@ -83,6 +83,15 @@ class MainActivity : Activity() {
                     }
                     return true
                 }
+                // 外部网页（申请 API Key、社区等）交给系统浏览器，别把对话页跳走
+                if (url.host != "127.0.0.1" && (url.scheme == "http" || url.scheme == "https")) {
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, url))
+                    } catch (_: Exception) {
+                        // 没有浏览器可用：留在原页面，不导航
+                    }
+                    return true
+                }
                 return false
             }
         }
