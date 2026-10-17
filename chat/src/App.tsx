@@ -224,7 +224,7 @@ function Menu({ onClose, openSettings, openBudget }: { onClose: () => void; open
         {item('💬', '社区：和大家聊聊记账与保障', () => window.open(COMMUNITY_URL, '_blank'))}
         {item('🧹', '清空本机数据重新开始', () => { if (confirm('确定清空本机所有记账与对话？')) { resetAll(); location.reload(); } })}
       </div>
-      <p className="mt-4 text-center text-xs text-muted">{isAndroidShell() ? '已连接本机通知采集' : isNativeIOS() ? '截图后打开 App 即可自动识别' : '数据仅存于本浏览器'} · 点滴集</p>
+      <p className="mt-4 text-center text-xs text-muted">{isAndroidShell() ? '已连接本机通知采集' : isNativeIOS() ? '截图后打开 App 即可自动识别' : '数据仅存于本浏览器'} · 必须品质</p>
     </Sheet>
   );
 }
@@ -257,7 +257,7 @@ export default function App() {
             <span className="text-2xl">{p.avatar}</span>
             <div>
               <div className="font-semibold leading-tight">{p.name}</div>
-              <div className="text-[11px] text-muted">点滴集 · {p.tagline}</div>
+              <div className="text-[11px] text-muted">品质记账 · {p.tagline}</div>
             </div>
           </div>
           <button onClick={() => setSheet('menu')} className="rounded-full bg-white px-3 py-1.5 text-sm shadow-sm">菜单</button>

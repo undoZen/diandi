@@ -65,7 +65,7 @@ async function askAI(turns: ChatTurn[], fallback: () => string, chips?: Chip[]):
 const GOALS = ['每月攒下一笔钱', '控制吃喝和网购', '先搞清楚钱都去哪了', '还清信用卡'];
 
 function startOnboarding(): void {
-  say('你好，我是点滴集 👋 一个陪你记账、帮你一点点把钱花明白的 AI。\n\n你的流水只存在这台设备上，AI 只会知道「哪一类花了多少钱」。\n\n先选一个陪你的伙伴吧（之后随时能换）：', [
+  say('你好，这里是品质记账 👋 少花钱，但品质还是必须。我是陪你记账的 AI，帮你把钱花在值得的地方。\n\n你的流水只存在这台设备上，AI 只会知道「哪一类花了多少钱」。\n\n先选一个陪你的伙伴吧（之后随时能换）：', [
     { label: `${PERSONAS.warm.avatar} ${PERSONAS.warm.name} · ${PERSONAS.warm.tagline}`, action: 'persona', arg: 'warm' },
     { label: `${PERSONAS.roast.avatar} ${PERSONAS.roast.name} · ${PERSONAS.roast.tagline}`, action: 'persona', arg: 'roast' },
   ]);
