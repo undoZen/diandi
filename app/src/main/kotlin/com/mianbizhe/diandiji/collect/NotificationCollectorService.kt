@@ -86,6 +86,13 @@ class NotificationCollectorService : NotificationListenerService() {
     override fun onListenerConnected() {
         isConnected = true
         Log.i(TAG, "listener connected")
+        // 补采：掉绑期间到达、仍留在通知栏里的消费通知（进程被杀→重绑之间最容易漏）。
+        // onNotificationPosted 按 sbnKey+contentHash 去重，重复喂入是幂等的。
+        try {
+            activeNotifications?.forEach { onNotificationPosted(it) }
+        } catch (e: Exception) {
+            Log.w(TAG, "backfill active notifications failed", e)
+        }
         // 清掉丢弃名单的存量记录（幂等，连接时跑一次开销可忽略）
         scope.launch {
             try {
