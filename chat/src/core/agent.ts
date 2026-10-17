@@ -6,6 +6,8 @@ import {
 import { localReview, localSpendComment } from './fallback';
 import { streamChat } from './llm';
 import { parseBankNotification, parseChatEntry, type ParsedSpend } from './parser';
+import { parseReceipt } from './receipt';
+import { isNativeIOS, latestScreenshot, recognizeFile, recognizeNative, thumbnailOf } from './ocr';
 import {
   getState, patchMessage, patchProfile, pushMessage, setState, uid,
   type Chip, type PersonaId, type ReviewRow, type Spend, type SpendSource,
@@ -124,6 +126,7 @@ export function finishOnboarding(): void {
     : `行，目标「${s.profile.goal}」，记住了。以后花一笔就发「午饭 35」，安卓会自动抓通知。每周一我来跟你算总账。`), [
     { label: '试试：午饭 35', action: 'send', arg: '午饭 35' },
     { label: '模拟一条银行通知', action: 'demo' },
+    { label: '📸 用支付截图记一笔', action: 'screenshot' },
   ]);
 }
 
@@ -300,3 +303,60 @@ export function consumeUrlSpend(): void {
 }
 
 export { CATEGORIES };
+
+// ───────────────────────── 截图记账 ─────────────────────────
+
+const pendingFiles = new Map<string, Blob>();
+
+function recordFromLines(msgId: string, lines: string[]): void {
+  const r = parseReceipt(lines);
+  if (!r) {
+    patchMessage(msgId, { state: 'failed' });
+    say('这张截图里没认出消费金额（可能是退款、收款或者不是支付页）。可以直接打字记，比如「午饭 35」。');
+    return;
+  }
+  patchMessage(msgId, { state: 'done' });
+  recordSpend({ amountCents: r.amountCents, merchant: r.merchant, channel: null, rawText: r.rawText }, 'screenshot',
+    { txTime: r.txTime && Math.abs(Date.now() - r.txTime) < 30 * 86_400_000 ? r.txTime : Date.now() });
+}
+
+/** iOS：打开/回到 App 时看 1 分钟内有没有新截图，有就问一句 */
+export async function checkRecentScreenshot(): Promise<void> {
+  if (!isNativeIOS() || getState().profile.onboardStep !== 'done') return;
+  const info = await latestScreenshot(60).catch(() => ({ found: false } as const));
+  if (!info.found || !info.id || getState().seenScreenshots.includes(info.id)) return;
+  setState((s) => ({ ...s, seenScreenshots: [...s.seenScreenshots.slice(-50), info.id!] }));
+  pushMessage({ id: uid(), kind: 'screenshot', createdAt: Date.now(), thumbnail: info.thumbnail, nativeId: info.id, state: 'ask' });
+}
+
+export async function applyScreenshot(msgId: string): Promise<void> {
+  const msg = getState().messages.find((m) => m.id === msgId);
+  if (!msg || msg.kind !== 'screenshot') return;
+  patchMessage(msgId, { state: 'reading', progress: 0 });
+  try {
+    const file = pendingFiles.get(msgId);
+    const lines = msg.nativeId
+      ? await recognizeNative(msg.nativeId)
+      : file ? await recognizeFile(file, (p) => patchMessage(msgId, { progress: p })) : [];
+    pendingFiles.delete(msgId);
+    recordFromLines(msgId, lines);
+  } catch (e) {
+    patchMessage(msgId, { state: 'failed' });
+    say(`识别失败了（${(e as Error).message}），可以直接打字记一笔。`);
+  }
+}
+
+export function dismissScreenshot(msgId: string): void {
+  pendingFiles.delete(msgId);
+  patchMessage(msgId, { state: 'dismissed' });
+}
+
+/** 浏览器/演示：用户主动选了一张截图，直接识别 */
+export async function addScreenshotFile(file: Blob): Promise<void> {
+  const id = uid();
+  pendingFiles.set(id, file);
+  const thumbnail = await thumbnailOf(file).catch(() => undefined);
+  pushMessage({ id, kind: 'screenshot', createdAt: Date.now(), thumbnail, state: 'ask' });
+  if (getState().profile.onboardStep === 'ai') finishOnboarding();
+  applyScreenshot(id);
+}

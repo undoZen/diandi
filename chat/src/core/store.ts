@@ -3,7 +3,7 @@ import { useSyncExternalStore } from 'react';
 import type { Category } from './classifier';
 
 export type PersonaId = 'warm' | 'roast';
-export type SpendSource = 'manual' | 'demo' | 'android' | 'shortcut';
+export type SpendSource = 'manual' | 'demo' | 'android' | 'shortcut' | 'screenshot';
 
 export interface Spend {
   id: string;
@@ -34,6 +34,8 @@ export type Message =
       local?: boolean; spendId?: string }
   | { id: string; kind: 'spend'; spendId: string; createdAt: number }
   | { id: string; kind: 'guess'; createdAt: number; done?: boolean }
+  | { id: string; kind: 'screenshot'; createdAt: number; thumbnail?: string; nativeId?: string;
+      state: 'ask' | 'reading' | 'done' | 'failed' | 'dismissed'; progress?: number }
   | { id: string; kind: 'review'; createdAt: number; period: 'week' | 'month'; periodKey: string;
       rows: ReviewRow[]; adopted?: boolean };
 
@@ -69,6 +71,8 @@ export interface State {
   spends: Spend[];
   messages: Message[];
   corrections: { merchant: string; category: Category }[];
+  /** 已经问过的 iOS 截图（PHAsset localIdentifier），同一张不重复问 */
+  seenScreenshots: string[];
   /** Android 已同步到的最大 remoteId */
   androidCursor: number;
 }
@@ -91,6 +95,7 @@ function initial(): State {
     spends: [],
     messages: [],
     corrections: [],
+    seenScreenshots: [],
     androidCursor: 0,
   };
 }

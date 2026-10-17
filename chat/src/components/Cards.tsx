@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { adoptReview, CATEGORIES, correctCategory, deleteSpend, submitGuess } from '../core/agent';
+import { adoptReview, applyScreenshot, CATEGORIES, correctCategory, deleteSpend, dismissScreenshot, submitGuess } from '../core/agent';
 import { CATEGORY_EMOJI, DEFAULT_GUESS, sumByCategory, weekKey, weekRange, yuan } from '../core/budget';
 import { useStore, type Message, type ReviewRow } from '../core/store';
 
-const SOURCE_LABEL = { manual: '手记', demo: '模拟通知', android: '通知自动采集', shortcut: '快捷指令' } as const;
+const SOURCE_LABEL = { manual: '手记', demo: '模拟通知', android: '通知自动采集', shortcut: '快捷指令', screenshot: '截图识别' } as const;
 
 export function ProgressBar({ spent, budget }: { spent: number; budget: number }) {
   const ratio = budget > 0 ? spent / budget : spent > 0 ? 1.01 : 0;
@@ -155,3 +155,29 @@ export function WeekSummary() {
   );
 }
 
+
+export function ScreenshotCard({ msg }: { msg: Extract<Message, { kind: 'screenshot' }> }) {
+  if (msg.state === 'dismissed') return null;
+  return (
+    <div className="mx-auto flex w-full max-w-sm gap-3 rounded-2xl border border-line bg-white p-3 shadow-sm">
+      {msg.thumbnail
+        ? <img src={msg.thumbnail} alt="截图" className="h-28 w-16 shrink-0 rounded-lg border border-line object-cover object-top" />
+        : <div className="flex h-28 w-16 shrink-0 items-center justify-center rounded-lg bg-paper text-2xl">🖼️</div>}
+      <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
+        <div className="text-sm">
+          {msg.state === 'ask' && (msg.nativeId ? '发现一张刚截的图，用它记这笔消费吗？' : '准备识别这张截图…')}
+          {msg.state === 'reading' && `正在本机识别文字…${msg.progress ? ` ${Math.round(msg.progress * 100)}%` : ''}`}
+          {msg.state === 'done' && '已识别 ✅'}
+          {msg.state === 'failed' && '没认出来 😵'}
+          <div className="mt-1 text-[11px] text-muted">🔒 图片只在本机识别，不上传</div>
+        </div>
+        {msg.state === 'ask' && msg.nativeId && (
+          <div className="flex gap-2">
+            <button onClick={() => applyScreenshot(msg.id)} className="rounded-full bg-ink px-3 py-1 text-sm text-white">用这张记一笔</button>
+            <button onClick={() => dismissScreenshot(msg.id)} className="rounded-full bg-paper px-3 py-1 text-sm">不用</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

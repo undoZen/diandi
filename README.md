@@ -135,4 +135,14 @@ npm run chat:build            # 产物在 chat/dist/，可直接挂到任意静�
 npm run chat:build:android    # 产物写进 app/src/main/assets/web，再 ./gradlew assembleDebug
 ```
 
+**iOS（Capacitor 原生壳，需在 Mac 上用 Xcode 构建）**：
+
+```bash
+cd chat && npm run ios:sync && npm run ios:open   # Xcode 里选真机运行
+```
+
+iOS 不能读其他 App 的通知，所以走「截图记账」：付完款截个图，切回点滴集，App 会发现 1 分钟内的新截图并询问是否用它记账；
+文字识别用系统 Vision 在本机完成（`ios/App/App/AppDelegate.swift` 里的 `RecentScreenshotPlugin`）。
+浏览器版的「📸 截图记账」用 tesseract.js 在浏览器本地识别。
+
 AI 点评用 OpenAI 兼容接口（默认 DeepSeek），在 App 菜单「AI 设置」里填自己的 Key，只存本机、浏览器直连。
