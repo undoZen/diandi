@@ -73,7 +73,10 @@ export function buildWeekReview(s: State, key: string): ReviewRow[] {
     const actualCents = actual[category] ?? 0;
     const projected = actualCents * scale;
     // 还在进行中的一周里一分没花的类别，不据此下调
-    let suggest = elapsedDays < 7 && actualCents === 0 ? budgetCents : (1 - w) * budgetCents + w * projected;
+    // 进行中的一周：天数越少，外推越不可信，真实值权重按已过天数打折；并且最多调到原预算的 2 倍
+    const wEff = w * (elapsedDays / 7);
+    let suggest = elapsedDays < 7 && actualCents === 0 ? budgetCents : (1 - wEff) * budgetCents + wEff * projected;
+    if (budgetCents > 0) suggest = Math.min(suggest, budgetCents * 2);
     if (tighten && actualCents > budgetCents) suggest *= 0.95;
     return { category, actualCents, budgetCents, suggestCents: round10(suggest) };
   }).filter((r) => r.budgetCents > 0 || r.actualCents > 0);
